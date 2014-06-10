@@ -82,6 +82,7 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
       U <- rnorm(N, sd = 1) + U2YCoef * uy.confounder
       err <- rnorm(N) + U2YCoef * uy.confounder
     } else if (break.method == "error") {
+      U <- rnorm(N, sd = 1)
       err <- rnorm(N)
     }
   } else {
