@@ -64,7 +64,7 @@ norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.st
 genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
                       confounding.function = c("linear", "exponential", "square"),
-                      break2sls = FALSE, break.method = c("collider", "error")) {
+                      break2sls = FALSE, break.method = c("collider", "error"), error.amount = 0.01) {
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
@@ -96,9 +96,9 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   #Z <- Z / sd(Z)
   if (break2sls & break.method == "error") {
     X <- switch(confounding.function,
-                linear = (Z2XCoef * Z) + (U2XCoef * U) + 0.01 * err + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) + (U2XCoef * exp(U)) + 0.01 * err + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) + (U2XCoef * U^2) + 0.01 * err + rnorm(N, sd = 1))
+                linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                exponential = (Z2XCoef * Z) + (U2XCoef * exp(U)) + error.amount * err + rnorm(N, sd = 1),
+                square = (Z2XCoef * Z) + (U2XCoef * U^2) + error.amount * err + rnorm(N, sd = 1))
   } else {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + rnorm(N, sd = 1),
@@ -207,7 +207,8 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
                               lambda, beta0, beta1, verbose = F, norta = F,
                               survival.distribution = c("exponential", "normal"),
                               confounding.function = c("linear", "exponential", "square"),
-                              break2sls = FALSE, break.method = c("collider", "error")) {
+                              break2sls = FALSE, break.method = c("collider", "error"),
+                              error.amount = 0.01) {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
   
@@ -224,7 +225,8 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
     #generate IV random variables
     vars <- genIVData(sample.size, Z2XCoef = instrument.strength, U2XCoef = conf.corr.X, U2YCoef = conf.corr.Y, 
                       beta0, beta1, confounding.function = confounding.function,
-                      survival.distribution = surv.dist, break2sls = break2sls, break.method = break.method)
+                      survival.distribution = surv.dist, break2sls = break2sls, break.method = break.method,
+                      error.amount = error.amount)
   }
   
   #if specified, print sample correlation between Z, X, U, and Y
@@ -292,7 +294,7 @@ simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.
 SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength,
                                        lambda, beta0, beta1, seed = NULL, norta=F, 
                                        survival.distribution = c("exponential", "normal"), break2sls = FALSE,
-                                       break.method = c("collider", "error")){
+                                       break.method = c("collider", "error"), error.amount = 0.01){
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
   # proposed by Professor Yu. It stores the results in vectors and returns a list containing these vectors.
@@ -317,7 +319,8 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                      instrument.strength = instrument.strength, lambda = lambda, 
                                      beta0 = beta0, beta1=beta1, norta = F,
                                      survival.distribution = survival.distribution, 
-                                     break2sls = break2sls, break.method = break.method)
+                                     break2sls = break2sls, break.method = break.method,
+                                     error.amount = error.amount)
 
       beta.tmp <- array(0, dim = length(type))
       
@@ -495,7 +498,8 @@ createGrid <- function(U2X.range, U2Y.range, Z2X.range, n.data, sample.size, lam
 simulateGrid <- function(est.eqns, grid, beta, seed = NULL, 
                          survival.distribution = c("exponential", "normal"),
                          confounding.function = c("linear", "exponential", "square"),
-                         break2sls = FALSE, break.method = c("collider", "error")) {
+                         break2sls = FALSE, break.method = c("collider", "error"),
+                         error.amount = 0.01) {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
   results <- array(0, dim = c(length(est.eqns), nrow(grid), (ncol(grid) + 12)))
@@ -515,7 +519,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                         instrument.strength = grid$Instrument.Strength[i], 
                                         lambda = grid$lambda[i], beta0 = 0, beta1 = beta, seed = seed,
                                         survival.distribution = survival.distribution, break2sls = break2sls,
-                                        break.method = break.method)
+                                        break.method = break.method, error.amount = error.amount)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res
     }
