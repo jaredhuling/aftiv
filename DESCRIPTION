@@ -1,0 +1,12 @@
+Package: aftiv
+Type: Package
+Title: Instrumental Variables for Survival Data
+Version: 1.0
+Date: 2013-12-26
+Author: Jared Huling
+Maintainer: Who to complain to <jaredhuling@gmail.com>
+Description: More about what it does (maybe more than one line)
+License: What license is it under?
+Depends: methods
+Depends: Rcpp (>= 0.10.6), RcppEigen (>= 0.3.1.2.1), Matrix, survival, BB, foreach, parallel, ggplot2, grid, SimCorMultRes
+LinkingTo: Rcpp, RcppEigen
