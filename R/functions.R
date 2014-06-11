@@ -64,7 +64,7 @@ norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.st
 genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
                       confounding.function = c("linear", "exponential", "square"),
-                      break2sls = FALSE, break.method = c("collider", "error"), error.amount = 0.01) {
+                      break2sls = FALSE, break.method = c("collider", "error", "error.u"), error.amount = 0.01) {
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
@@ -84,6 +84,9 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
     } else if (break.method == "error") {
       U <- rnorm(N, sd = 1)
       err <- rnorm(N)
+    } else if (break.method == "error.u") {
+      err <- rnorm(N)
+      U <- rnorm(N, sd = 1) + err * error.amount
     }
   } else {
     U <- rnorm(N, sd = 1)
@@ -112,7 +115,7 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                 exponential = rexp(N, rate = exp(-(beta0 + beta1 * X + U2YCoef * U))),
                 normal = exp(beta0 + beta1 * X + U2YCoef * U + err))
   } else {
-    if (break.method == "error") {
+    if (break.method == "error" | break.method == "error.u") {
       Y <- exp(beta0 + beta1 * X + U2YCoef * U + err)
     } else {
       Y <- exp(beta0 + beta1 * X + err)
@@ -207,7 +210,7 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
                               lambda, beta0, beta1, verbose = F, norta = F,
                               survival.distribution = c("exponential", "normal"),
                               confounding.function = c("linear", "exponential", "square"),
-                              break2sls = FALSE, break.method = c("collider", "error"),
+                              break2sls = FALSE, break.method = c("collider", "error", "error.u"),
                               error.amount = 0.01) {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
@@ -294,7 +297,7 @@ simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.
 SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength,
                                        lambda, beta0, beta1, seed = NULL, norta=F, 
                                        survival.distribution = c("exponential", "normal"), break2sls = FALSE,
-                                       break.method = c("collider", "error"), error.amount = 0.01){
+                                       break.method = c("collider", "error", "error.u"), error.amount = 0.01){
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
   # proposed by Professor Yu. It stores the results in vectors and returns a list containing these vectors.
@@ -498,7 +501,7 @@ createGrid <- function(U2X.range, U2Y.range, Z2X.range, n.data, sample.size, lam
 simulateGrid <- function(est.eqns, grid, beta, seed = NULL, 
                          survival.distribution = c("exponential", "normal"),
                          confounding.function = c("linear", "exponential", "square"),
-                         break2sls = FALSE, break.method = c("collider", "error"),
+                         break2sls = FALSE, break.method = c("collider", "error", "error.u"),
                          error.amount = 0.01) {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
