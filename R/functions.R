@@ -637,7 +637,11 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
                     survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat))
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat))
     }
-    ret <- list(par = df$par, fval = fval, iter = df$iter)
+    ret <- list(par = df$par, fval = fval, iter = df$iter,
+                nobs = nrow(data$X), nvars = length(df$par),
+                GC = GC, 
+                instrument.names = instrument.names, 
+                confounded.x.names = confounded.x.names)
   } else if (fit.method == "nleqslv" | fit.method == "sane") {
     if (!is.null(est.eqn)) {
       if (attr(est.eqn, "name") != "AFTScoreSmoothPre" & attr(est.eqn, "name") != "AFTivScoreSmoothPre") {
@@ -659,7 +663,11 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
       df <- sane(par = init.par, fn = est.eqn, ...,
                  survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), tau = 0.01)
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), tau = 0.01)
-      ret <- list(par = df$par, fval = fval, iter = df$iter)
+      ret <- list(par = df$par, fval = fval, iter = df$iter,
+                  nobs = nrow(data$X), nvars = length(df$par),
+                  GC = GC, 
+                  instrument.names = instrument.names, 
+                  confounded.x.names = confounded.x.names)
     }
   } else if (fit.method == "multiStart") {
     #Derivative-Free Spectral Approach for solving nonlinear systems of equations
