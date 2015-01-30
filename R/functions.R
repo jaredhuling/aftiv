@@ -704,7 +704,7 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
 }
 
 repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NULL, instrument.names, confounded.x.names,
-                      init.par = NULL, init.method = c("lm", "bisection"), final.fit = T,
+                      init.par = NULL, init.method = c("lm", "bisection"), final.fit = TRUE,
                       fit.method = c("dfsane", "multiStart", "nleqslv", "sane"), ...) {
   # repeatedly calls fitAFT until convergence. decreasing noise 
   # is added to coefficients at each call to encourage solution
@@ -737,6 +737,7 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
   }
   best.est$est.eqn <- est.eqn
   best.est$est.eqn.smooth <- est.eqn.sm
+  best.est$final.fit <- final.fit
   best.est$call <- match.call()
   best.est
 }

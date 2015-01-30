@@ -14,7 +14,11 @@ lsBootstrap <- function(beta, esteqn, B, nobs, ...) {
   
   AA.inv <- solve(AA)
   
-  list(var = AA.inv %*% V %*% t(AA.inv), A = AA, V = V)
+  variance <- AA.inv %*% V %*% t(AA.inv)
+  
+  se.hat <- sqrt(diag(variance)) / sqrt(nobs)
+  
+  list(se.hat = se.hat, var = variance, A = AA, V = V)
 }
 
 svBootstrap <- function(beta, esteqn, B, nobs, ...) {
@@ -30,19 +34,33 @@ svBootstrap <- function(beta, esteqn, B, nobs, ...) {
   
   Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
   
-  sigma.hat <- var(Un2)
+  sigma.hat <- solve(var(Un2))
   
-  list(var = solve(sigma.hat), V = V)  
+  se.hat <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  
+  list(se.hat = se.hat, var = sigma.hat, V = V)  
 }
 
 
-bootstrapVar <- function(fitted.obj, data, est.eqn) {
+bootstrapVar <- function(fitted.obj, data, 
+                         method = c("ls", "sv", "full.bootstrap"), 
+                         B = 1000L) {
+  # takes a fitted aft.fit object and computes estimated variance using
+  # a bootstrap approach. supports 2 fast multiplier boostrap techniques
+  # in addition to traditional boostrap estimate
   
+  method <- match.arg(method)
   stopifnot(class(data) == "survival.data")
   stopifnot(class(aft.fit) == "aft.fit")
   
   conf.x.loc <- match(confounded.x.names, colnames(data$X))
   ZXmat <- data$X
+  
+  if (fitted.obj$final.fit) {
+    est.eqn <- fitted.obj$est.eqn.sm
+  } else {
+    est.eqn <- fitted.obj$est.eqn
+  }
   
   if (attr(est.eqn, "name") == "AFT2SLSScorePre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre"
       | attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") {
@@ -76,4 +94,16 @@ bootstrapVar <- function(fitted.obj, data, est.eqn) {
   } else {
     ZXmat[,conf.x.loc] <- data$Z
   }
+  
+  if (method == "ls") {
+    bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                      B = B, nobs = fitted.obj$nobs)
+  } else if (method == "sv") {
+    bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                      B = B, nobs = fitted.obj$nobs)
+  } else {
+    stop("method not supported yet")
+  }
+  
+  bs
 }
