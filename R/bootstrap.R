@@ -85,22 +85,37 @@ bootstrapVar <- function(fitted.obj, data,
       attr(est.eqn, "name") <- "AFTScorePre"
     }
     
-    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
-      #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
-      
-    }
+
     
   } else {
     ZXmat[,conf.x.loc] <- data$Z
   }
   
   if (method == "ls") {
-    bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                      B = B, nobs = fitted.obj$nobs)
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
+      #generate function G_c() for ICPW 
+      GC <- genKMCensoringFunc(data$survival)
+      bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, GC = GC)
+    } else {
+      bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
+    }
+
   } else if (method == "sv") {
-    bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                      B = B, nobs = fitted.obj$nobs)
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
+      #generate function G_c() for ICPW 
+      GC <- genKMCensoringFunc(data$survival)
+      bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, GC = GC)
+    } else {
+      bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
+    }
   } else {
     stop("method not supported yet")
   }
