@@ -387,37 +387,42 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC)
   nvars <- ncol(X)
   
   #transform to log-time
-  survival$t <- log(survival$t)
+  tt <- log(survival$t)
   
   #creates G_c(T_i) term in the IPCW estimating equation
-  survival$GCT <- GC(exp(survival$t))
+  GCT <- GC( survival$t )
+  
+  bX <- X %*% beta
   
   #store the T_i - bX_i term (error)
-  survival$err = survival$t - X %*% beta
+  err = survival$t - bX
   
-  survival$bX <- X %*% beta
+  
   
   #sort according to error size ####observed failure time 
   #data.simu <- data.simu[order(data.simu$X),]  
-  order.idx <- order(survival$err)
-  survival <- survival[order.idx,] 
+  order.idx <- order(err)
+  survival <- survival[order.idx,]
+  tt <- tt[order.idx]
+  bX <- bX[order.idx]
+  err <- err[order.idx]
   X <- as.matrix(X[order.idx,])
   Z <- as.matrix(Z[order.idx,]) 
   
   
   #create indicator to set to zero terms where GCT == 0 and 
   #set to 1 so no dividing by zero occurs
-  zero.indicator <- 1 * (survival$GCT != 0)
-  survival$GCT[which(survival$GCT == 0)] <- 1
+  zero.indicator <- 1 * (GCT != 0)
+  GCT[which(GCT == 0)] <- 1
   
   #first col is as.risk.terms, remaining are at.risk.Z.terms
-  at.risk.mat <- genIPCWNumDenomMultivar(survival, Z, GC)
+  at.risk.mat <- genIPCWNumDenomMultivar2(bX, Z, err, GC)
   
   #generate empty vector to return eventually
   ret.vec <- numeric(nvars)
   for (i in 1:nvars) {
     #return the score   
-    ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * (at.risk.mat[,1] * Z[,i] - at.risk.mat[,i + 1])) / sqrt(n)
+    ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * (at.risk.mat[,1] * Z[,i] - at.risk.mat[,i + 1])) / sqrt(n)
   }
   
   ret.vec
@@ -523,12 +528,12 @@ evalAFTivScoreSmooth <- function(data.simu, beta)
   stdev <- roughResidSDEstAFTIV(data.simu)
   
   #the denominator of the at-risk comparison term  
-  data.simu$at.risk.terms <- unlist(lapply(dat[,"err"], function(x) 
-    sum(pnorm(nrow(data.simu)^(0.26) * (dat$err - x) / stdev))))
+  data.simu$at.risk.terms <- unlist(lapply(data.simu[,"err"], function(x) 
+    sum(pnorm(nrow(data.simu)^(0.26) * (data.simu$err - x) / stdev))))
   
   #the numerator of the at-risk comparison term  
-  data.simu$at.risk.X.terms <- unlist(lapply(dat[,"err"], function(x) 
-    sum(dat$Z * pnorm(nrow(data.simu)^(0.26) * (dat$err - x) / stdev))))
+  data.simu$at.risk.X.terms <- unlist(lapply(data.simu[,"err"], function(x) 
+    sum(data.simu$Z * pnorm(nrow(data.simu)^(0.26) * (data.simu$err - x) / stdev))))
   
   #return the score   
   sum(data.simu$delta * (data.simu$at.risk.terms * data.simu$Z - data.simu$at.risk.Z.terms)) / sqrt(nrow(data.simu))

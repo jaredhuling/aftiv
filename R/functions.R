@@ -100,13 +100,13 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   if (break2sls & break.method == "error") {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) + (U2XCoef * exp(U)) + error.amount * err + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) + (U2XCoef * U^2) + error.amount * err + rnorm(N, sd = 1))
+                exponential = (Z2XCoef * Z) + exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                square = (Z2XCoef * Z) + (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
   } else {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) + (U2XCoef * exp(U)) + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) + (U2XCoef * U^2) + rnorm(N, sd = 1))
+                exponential = (Z2XCoef * Z) + exp(U2XCoef * U) + rnorm(N, sd = 1),
+                square = (Z2XCoef * Z) + (U2XCoef * U)^2 + rnorm(N, sd = 1))
   }
   #X <- X / sd(X)
   
@@ -564,6 +564,7 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
   if (fit.method == "dfsane" & is.null(est.eqn)) {
     stop("Please supply est.eqn if using fit.method: df.sane")
   }
+  GC <- NULL
   init.method <- match.arg(init.method)
   #instr.loc <- match(instrument.names, colnames(data$X))
   conf.x.loc <- match(confounded.x.names, colnames(data$X))
@@ -689,7 +690,8 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
       colnames(p0) <- colnames(data$X)
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat))
     }
-    ret <- list(par = df$par, fval = fval, iter = df$iter)
+    ret <- list(par = df$par, fval = fval, iter = df$iter, nobs = nrow(data$X), nvars = length(df$par),
+                GC = GC, est.eqn = )
   }
   ret$sum.sq.fval <- sum(ret$fval^2)
   if (init.method == "multiStart") {ret <- df}
