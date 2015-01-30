@@ -690,8 +690,11 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
       colnames(p0) <- colnames(data$X)
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat))
     }
-    ret <- list(par = df$par, fval = fval, iter = df$iter, nobs = nrow(data$X), nvars = length(df$par),
-                GC = GC, est.eqn = )
+    ret <- list(par = df$par, fval = fval, iter = df$iter, 
+                nobs = nrow(data$X), nvars = length(df$par),
+                GC = GC, 
+                instrument.names = instrument.names, 
+                confounded.x.names = confounded.x.names)
   }
   ret$sum.sq.fval <- sum(ret$fval^2)
   if (init.method == "multiStart") {ret <- df}
@@ -732,6 +735,8 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
                        fit.method = "nleqslv", init.par = init.par, global = "dbldog", method = "Broyden", 
                        control = list(ftol=1e-3, btol=1e-4, trace=1))
   }
+  best.est$est.eqn <- est.eqn
+  best.est$est.eqn.smooth <- est.eqn.sm
   best.est$call <- match.call()
   best.est
 }
