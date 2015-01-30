@@ -657,7 +657,11 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
     if (fit.method == "nleqslv") {
       df <- nleqslv(x = init.par, fn = est.eqn, ..., 
                     survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), tau = 0.01)
-      ret <- list(par = df$x, fval = df$fvec, iter = df$iter)
+      ret <- list(par = df$x, fval = df$fvec, iter = df$iter,
+                  nobs = nrow(data$X), nvars = length(df$par),
+                  GC = GC, 
+                  instrument.names = instrument.names, 
+                  confounded.x.names = confounded.x.names)
       #print(df)
     } else if (fit.method == "sane") {
       df <- sane(par = init.par, fn = est.eqn, ...,
