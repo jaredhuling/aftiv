@@ -53,7 +53,7 @@ bootstrapVar <- function(fitted.obj, data,
   stopifnot(class(data) == "survival.data")
   stopifnot(class(fitted.obj) == "aft.fit")
   
-  conf.x.loc <- match(confounded.x.names, colnames(data$X))
+  conf.x.loc <- match(fitted.obj$confounded.x.names, colnames(data$X))
   ZXmat <- data$X
   
   if (fitted.obj$final.fit) {
