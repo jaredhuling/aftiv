@@ -20,6 +20,7 @@ aftfit <- function(formula,
                    ...) {
   
   method <- match.arg(method, several.ok = TRUE)
+  boot.method <- match.arg(method)
   Call <- match.call()
   
   # create a call to model.frame() that contains the formula (required)
