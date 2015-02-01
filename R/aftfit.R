@@ -7,7 +7,7 @@ aftfit <- function(formula,
                    method = c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW"),
                    smoothed = FALSE,
                    weights = NULL, 
-                   run.bootstrap = FALSE,
+                   bootstrap = FALSE,
                    B = 1000L,
                    na.action, 
                    init = NULL, 
@@ -74,16 +74,11 @@ aftfit <- function(formula,
   surv.dat <- vector(mode = "list", length = 3)
   names(surv.dat) <- c("survival", "X", "Z")
   surv.dat[[1]] <- data.frame(Y[,1], Y[,2])
-  
-  print(str(Y))
-  print(Y[1:5, 1:2])
-  
+
   colnames(surv.dat[[1]]) <- c("log.t", "delta")
   surv.dat[[2]] <- X
   surv.dat[[3]] <- instrument
-  
   attr(surv.dat, "class") <- "survival.data"
-  print(str(surv.dat))
   
   beta <- se.hat <- array(0, dim = c(length(type), nvars))
   fit.objects <- bootstrap.objects <- vector(length = length(type), mode = "list")
@@ -92,7 +87,7 @@ aftfit <- function(formula,
   trace <- FALSE
   if (verbose) {
     trace <- TRUE
-    if (verbose > 1) {
+    if (verbose <= 1) {
       quiet <- FALSE
     }
   }
@@ -102,7 +97,7 @@ aftfit <- function(formula,
   } else {
     BB.ns <- FALSE
   }
-  print("okay?")
+
   #solve each estimating equation for beta
   for (e in 1:length(method)){
     #return correct estimating equation function
@@ -129,7 +124,6 @@ aftfit <- function(formula,
     
     if (verbose) {
       cat("Fitting model", e)
-      print(":lobo")
     }
     
     #solve for beta using deriv-free spectral method
@@ -138,7 +132,7 @@ aftfit <- function(formula,
                      fit.method = "dfsane", init.par = init.par, final.fit = smoothed,
                      method = c(2), control = BB.control, quiet = quiet)
     
-    if (run.bootstrap) {
+    if (bootstrap) {
       # bootstrap estimate
       bootstrap.objects[[e]] <- bootstrapVar(aft.repfit, dat.sim, B = B, method = boot.method)
       se.hat[e, ] <- bootstrap.objects[[e]]$se.hat
