@@ -78,7 +78,7 @@ aftfit <- function(formula,
   print(str(Y))
   print(Y[1:5, 1:2])
   
-  colnames(Y) <- c("log.t", "delta")
+  colnames(surv.dat[[1]]) <- c("log.t", "delta")
   surv.dat[[2]] <- X
   surv.dat[[3]] <- instrument
   
