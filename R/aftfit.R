@@ -8,6 +8,7 @@ aftfit <- function(formula,
                    smoothed = FALSE,
                    weights = NULL, 
                    bootstrap = FALSE,
+                   boot.method = c("ls", "sv", "full.bootstrap"),
                    B = 1000L,
                    na.action, 
                    init = NULL, 
@@ -53,7 +54,7 @@ aftfit <- function(formula,
   contrast.arg <- NULL  #due to shared code with model.matrix.coxph
   
   X <- model.matrix(Terms, mf, contrasts=contrast.arg)
-  print(head(X))
+  #print(head(X))
   # drop the intercept after the fact, and also drop strata if necessary
   
   Xatt <- attributes(X) 
