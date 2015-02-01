@@ -200,7 +200,7 @@ roughResidSDEstAFTIV <- function(dat) {
 roughResidSDEstAFT <- function(dat) {
   # returns rough estimate of sd of residuals
   # for smoothed rank estimator for AFT
-  if (all(dat$t >= 0)) {dat$t <- log(dat$t)}
+  #if (all(dat$t >= 0)) {dat$t <- log(dat$t)}
   lm.fit <- lm(t ~ X, data = dat)
   sd(resid(lm.fit))
 }
@@ -728,7 +728,8 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
     
     #solve for beta using deriv-free spectral method
     est <- fitAFT(data = data, est.eqn = est.eqn, 
-                  instrument.names = instrument.names, confounded.x.names = confounded.x.names, 
+                  instrument.names = instrument.names, 
+                  confounded.x.names = confounded.x.names, 
                   fit.method = fit.method, init.par = init.par, ...)
     ssf <- est$sum.sq.fval
     sd <- 5e-6 * min(sqrt(best.ssf), 5e2)
@@ -743,8 +744,10 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
   }
   if (final.fit) {
     best.est <- fitAFT(data = data, est.eqn = est.eqn.sm, 
-                       instrument.names = instrument.names, confounded.x.names = confounded.x.names, 
-                       fit.method = "nleqslv", init.par = init.par, global = "dbldog", method = "Broyden", 
+                       instrument.names = instrument.names, 
+                       confounded.x.names = confounded.x.names, 
+                       fit.method = "nleqslv", init.par = init.par, 
+                       global = "dbldog", method = "Broyden", 
                        control = list(ftol=1e-3, btol=1e-4, trace=1))
   }
   best.est$est.eqn <- est.eqn

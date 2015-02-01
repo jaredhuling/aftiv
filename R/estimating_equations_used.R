@@ -65,8 +65,10 @@ AFTScorePre <- function(beta, survival, X, ZXmat, multiplier.wts = NULL)
   }
   nvars <- ncol(X)
   
-  #transform to log-time
-  if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  if (!is.null(survival$t)) {
+    #transform to log-time
+    if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  }
   
   #store the T_i - bX_i term (error)
   survival$err = survival$log.t - X %*% beta
@@ -118,8 +120,10 @@ AFTivScorePre <- function(beta, survival, X, ZXmat, multiplier.wts = NULL)
   }
   nvars <- ncol(X)
   
-  #transform to log-time
-  if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  if (!is.null(survival$t)) {
+    #transform to log-time
+    if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  }
   
   #store the T_i - bX_i term (error)
   survival$err = survival$log.t - X %*% beta
@@ -169,8 +173,10 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, multiplier.wts = NUL
   }
   nvars <- ncol(X)
   
-  #transform to log-time
-  if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  if (!is.null(survival$t)) {
+    #transform to log-time
+    if (is.null(survival$log.t)) {survival$log.t <- log(survival$t)}
+  }
   
   #creates G_c(T_i) term in the IPCW estimating equation
   survival$GCT <- GC(survival$t)
@@ -235,10 +241,12 @@ AFTivScoreSmoothPre <- function(beta, survival, X, ZXmat, tau = 1e-3)
   n <- nrow(X)
   nvars <- ncol(X)
   
-  #transform to log-time
-  if (is.null(survival$log.t)) {
-    log.t <- log(survival$t)
-  } else (log.t <- survival$log.t)
+  if (!is.null(survival$t)) {
+    #transform to log-time
+    if (is.null(survival$log.t)) {
+      log.t <- log(survival$t)
+    } else (log.t <- survival$log.t)
+  }
   
   delta <- survival$delta
   
