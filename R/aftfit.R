@@ -20,7 +20,7 @@ aftfit <- function(formula,
                    ...) {
   
   method <- match.arg(method, several.ok = TRUE)
-  boot.method <- match.arg(method)
+  boot.method <- match.arg(boot.method)
   Call <- match.call()
   
   # create a call to model.frame() that contains the formula (required)
@@ -59,11 +59,13 @@ aftfit <- function(formula,
   # drop the intercept after the fact, and also drop strata if necessary
   
   Xatt <- attributes(X) 
+  adrop = 0
+  xdrop <- Xatt$assign %in% adrop 
   #xdrop <- Xatt$assign %in% adrop  #columns to drop (always the intercept)
-  #X <- X[, !xdrop, drop=FALSE]
-  #attr(X, "assign") <- Xatt$assign[!xdrop]
-  #if (any(adrop>0)) attr(X, "contrasts") <- Xatt$contrasts[-adrop]
-  #else attr(X, "contrasts") <- Xatt$contrasts
+  X <- X[, !xdrop, drop=FALSE]
+  attr(X, "assign") <- Xatt$assign[!xdrop]
+  if (any(adrop>0)) attr(X, "contrasts") <- Xatt$contrasts[-adrop]
+  else attr(X, "contrasts") <- Xatt$contrasts
   attr(X, "contrasts") <- Xatt$contrasts
   offset <- model.offset(mf)
   if (is.null(offset) | all(offset==0)) offset <- rep(0., nrow(mf))
