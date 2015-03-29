@@ -22,7 +22,7 @@ aftfit <- function(formula,
   method <- match.arg(method, several.ok = TRUE)
   boot.method <- match.arg(boot.method)
   Call <- match.call()
-  
+
   # create a call to model.frame() that contains the formula (required)
   #  and any other of the relevant optional arguments
   # then evaluate it in the proper frame
@@ -50,7 +50,7 @@ aftfit <- function(formula,
   
   types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW")
   funcs <- c("AFTScorePre", "AFTivScorePre", "AFT2SLSScorePre", "AFTivIPCWScorePre")
-  funcs.sm <- c("AFTScoreSmoothPre", "AFTivScoreSmoothPre", "AFT2SLSScoreSmoothPre")
+  funcs.sm <- c("AFTScoreSmoothPre", "AFTivScoreSmoothPre", "AFT2SLSScoreSmoothPre", "AFTivIPCWScoreSmooth")
   
   contrast.arg <- NULL  #due to shared code with model.matrix.coxph
   
@@ -78,22 +78,29 @@ aftfit <- function(formula,
   surv.dat <- vector(mode = "list", length = 3)
   names(surv.dat) <- c("survival", "X", "Z")
   surv.dat[[1]] <- data.frame(Y[,1], Y[,2])
+  
+  if (is.null(dim(instrument))) {
+    instrument <- matrix(instrument, ncol = 1)
+  }
+  
+  stopifnot(nrow(X) == nrow(instrument))
 
   colnames(surv.dat[[1]]) <- c("log.t", "delta")
   surv.dat[[2]] <- X
   surv.dat[[3]] <- instrument
   attr(surv.dat, "class") <- "survival.data"
   
-  beta <- se.hat <- array(0, dim = c(length(type), nvars))
-  fit.objects <- bootstrap.objects <- vector(length = length(type), mode = "list")
+  beta <- se.hat <- array(0, dim = c(length(method), nvars))
+  rownames(beta) <- rownames(se.hat) <- method
+  colnames(beta) <- colnames(se.hat) <- colnames(X)
+  fit.objects <- bootstrap.objects <- vector(length = length(method), mode = "list")
+  names(fit.objects) <- names(bootstrap.objects) <- method
   
   quiet <- TRUE
   trace <- FALSE
-  if (verbose) {
+  if (verbose > 1) {
     trace <- TRUE
-    if (verbose <= 1) {
-      quiet <- FALSE
-    }
+    quiet <- FALSE
   }
   
   if (is.null(BB.control)) {
@@ -106,10 +113,11 @@ aftfit <- function(formula,
   for (e in 1:length(method)){
     #return correct estimating equation function
     est.eqn <- match.fun(funcs[[match(method[e], types)]])
-    est.eqn.sm <- match.fun(funcs.sm[[match(method[e], types)]])
     attr(est.eqn, "name") <- funcs[[match(method[e], types)]]
-    attr(est.eqn.sm, "name") <- funcs.sm[[match(method[e], types)]]
     
+    est.eqn.sm <- match.fun(funcs.sm[[match(method[e], types)]])
+    attr(est.eqn.sm, "name") <- funcs.sm[[match(method[e], types)]]
+
     if (BB.ns) {
       dfsane.tol <- 0.000001
       if (method[e] == "AFT-IPCW") {dfsane.tol <- 8}
@@ -123,11 +131,11 @@ aftfit <- function(formula,
       init.par <- init
     } else {
       init.par <- est$par
-      init.par <- NULL
+      #init.par <- NULL
     }
     
     if (verbose) {
-      cat("Fitting model", e)
+      cat("Fitting model", e, "\n")
     }
     
     #solve for beta using deriv-free spectral method
@@ -137,8 +145,12 @@ aftfit <- function(formula,
                      method = c(2), control = BB.control, quiet = quiet)
     
     if (bootstrap) {
+      if (verbose) {
+        cat("Bootstrapping model", e, "\n")
+      }
+      
       # bootstrap estimate
-      bootstrap.objects[[e]] <- bootstrapVar(aft.repfit, dat.sim, B = B, method = boot.method)
+      bootstrap.objects[[e]] <- bootstrapVar(est, surv.dat, B = B, method = boot.method)
       se.hat[e, ] <- bootstrap.objects[[e]]$se.hat
     }
     
@@ -147,7 +159,9 @@ aftfit <- function(formula,
     
     
   }
-  list(beta = beta, se = se.hat, fit.objects = fit.objects, 
-       bootstrap.objects = bootstrap.objects,
-       B = B, Call = Call)
+  ret <- list(beta = beta, se = se.hat, fit.objects = fit.objects, 
+              bootstrap.objects = bootstrap.objects,
+              B = B, Call = Call)
+  class(ret) <- "aftfits"
+  ret
 }

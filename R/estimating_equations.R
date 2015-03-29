@@ -312,7 +312,11 @@ genKMCensoringFunc <- function(data){
   require(survival)
   data$delta.G <- 1 - data$delta
   if (is.null(data$t.original)) {
-    cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
+    if (is.null(data$t)) {
+      cens.fit <- survfit(Surv(exp(log.t), delta.G) ~ 1, data = data)
+    } else {
+      cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
+    }
   } else {
     cens.fit <- survfit(Surv(t.original, delta.G) ~ 1, data = data)
   }

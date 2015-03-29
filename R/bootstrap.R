@@ -53,6 +53,8 @@ bootstrapVar <- function(fitted.obj, data,
   stopifnot(class(data) == "survival.data")
   stopifnot(class(fitted.obj) == "aft.fit")
   
+  
+  
   conf.x.loc <- match(fitted.obj$confounded.x.names, colnames(data$X))
   ZXmat <- data$X
   
@@ -61,7 +63,7 @@ bootstrapVar <- function(fitted.obj, data,
   } else {
     est.eqn <- fitted.obj$est.eqn
   }
-  
+
   if (attr(est.eqn, "name") == "AFT2SLSScorePre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre"
       | attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") {
     #if 2SLS is used, replace Z with Xhat 
