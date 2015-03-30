@@ -7,6 +7,5 @@ Author: Jared Huling
 Maintainer: Who to complain to <jaredhuling@gmail.com>
 Description: More about what it does (maybe more than one line)
 License: What license is it under?
-Depends: methods
-Depends: Rcpp (>= 0.10.6), RcppEigen (>= 0.3.1.2.1), Matrix, survival, BB, foreach, parallel, ggplot2, grid, SimCorMultRes, MASS
+Depends: Rcpp (>= 0.10.6), RcppEigen (>= 0.3.1.2.1), Matrix, survival, BB, foreach, parallel, ggplot2, grid, SimCorMultRes, MASS, methods
 LinkingTo: Rcpp, RcppEigen
