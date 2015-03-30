@@ -296,6 +296,8 @@ simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.
 
 SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength,
                                        lambda, beta0, beta1, seed = NULL, norta=F, 
+                                       B = 200L, conf.level = 0.95,
+                                       bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                                        survival.distribution = c("exponential", "normal"), break2sls = FALSE,
                                        break.method = c("collider", "error", "error.u"), error.amount = 0.01){
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
@@ -305,12 +307,21 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
   #set seed if supplied by user
   if (!is.null(seed)) {set.seed(seed)}
   
+  boot.method <- match.arg(boot.method)
+  
   #check to make sure user specified allowed estimating equations
   types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW", "AFT-2SLS-xhat")
   funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScore", "vEvalAFTivIPCWScore", "vEvalAFT2SLSxhatScore")
   for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
+  if (bootstrap) {
+    warning("Bootstrap does not work yet")
+  }
+  
+  zval <- qnorm((1 + conf.level)/2, 0, 1)
+  
   beta.store <- array(0, dim = c(n.sims, length(type)))
+  coverage.store <- array(NA, dim = c(n.sims, length(type)))
   l <- 0
   pct.censored <- NULL
   num.errors <- tot.cors <- 0
@@ -326,6 +337,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                      error.amount = error.amount)
 
       beta.tmp <- array(0, dim = length(type))
+      coverage.tmp <- array(NA, dim = length(type))
       
       #solve each estimating equation for beta1
       for (e in 1:length(type)){
@@ -335,6 +347,16 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
         #solve for beta using bisection method
         beta.tmp[e] <- uniroot(est.eqn, interval = c(beta1 - 3, beta1 + 3), tol = 0.001, "data.simu" = Data.simu)$root
         
+        
+        if (bootstrap) {
+          # bootstrap estimate
+          se.hat <- bootstrapVar(est, Data.simu, B = B, method = boot.method)$se.hat
+          
+          tmp <- c(beta.tmp[e] - zval * se.hat,
+                   beta.tmp[e] + zval * se.hat)
+          
+          coverage.tmp[e] <- 1 * (beta1 >= tmp[1] & beta1 <= tmp[2])
+        }
       }
       
     }, error=function(e) e)
@@ -345,6 +367,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
       l <- l + 1
       #store results on successful attempt
       beta.store[l, ] <- beta.tmp
+      coverage.store[l, ] <- coverage.tmp
       setTxtProgressBar(pb, l)
       pct.censored[l] <- mean(1 - Data.simu$delta)
       #add correlation matrix so we can take mean
@@ -360,6 +383,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
   attr(res, "truth") <- beta1
   attr(res, "pct.censored") <- mean(pct.censored)
   attr(res, "avg.cor") <- avg.cors
+  attr(res, "coverage") <- colMeans(coverage.store)
   class(res) <- "AFTsim"
   res
 }
@@ -368,6 +392,8 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
 
 SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength,
                                                lambda, beta, seed = NULL, norta=F, intercept = F,
+                                               B = 200L, conf.level = 0.95,
+                                               bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                                                survival.distribution = c("exponential", "normal"), break2sls = FALSE){
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
@@ -376,13 +402,19 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
   #set seed if supplied by user
   if (!is.null(seed)) {set.seed(seed)}
   
+  boot.method <- match.arg(boot.method)
+  
   #check to make sure user specified allowed estimating equations
   types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW")
   funcs <- c("AFTScorePre", "AFTivScorePre", "AFT2SLSScorePre", "AFTivIPCWScorePre")
   funcs.sm <- c("AFTScoreSmoothPre", "AFTivScoreSmoothPre", "AFT2SLSScoreSmoothPre")
   for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
+  
+  zval <- qnorm((1 + conf.level)/2, 0, 1)
+  
   beta.store <- array(0, dim = c(n.sims, length(type)))
+  coverage.store <- array(NA, dim = c(n.sims, length(type)))
   l <- 0
   pct.censored <- NULL
   num.errors <- tot.cors <- 0
@@ -400,6 +432,7 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
         colnames(Data.simu$X)[1] <- "Intercept"
       }
       beta.tmp <- array(0, dim = length(type))
+      coverage.tmp <- array(NA, dim = length(type))
       
       #solve each estimating equation for beta1
       for (e in 1:length(type)){
@@ -429,6 +462,18 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
         conf.x.idx <- match(paste("X", 1:1, sep=""), names(est$par))
         beta.tmp[e] <- est$par[conf.x.idx]
         
+        if (bootstrap) {
+          # bootstrap estimate
+          se.hat <- bootstrapVar(est, Data.simu, B = B, method = boot.method)$se.hat
+          
+          tmp <- c(beta.tmp[e] - zval * se.hat,
+                   beta.tmp[e] + zval * se.hat)
+          
+          coverage.tmp[e] <- 1 * (beta[conf.x.idx] >= tmp[1] & beta[conf.x.idx] <= tmp[2])
+        }
+        
+
+        
       }
       
     }, error=function(e) e)
@@ -440,6 +485,7 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
       l <- l + 1
       #store results on successful attempt
       beta.store[l, ] <- beta.tmp
+      coverage.store[l, ] <- coverage.tmp
       setTxtProgressBar(pb, l)
       pct.censored[l] <- mean(1 - Data.simu$survival$delta)
       #add correlation matrix so we can take mean
@@ -455,6 +501,7 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
   attr(res, "truth") <- beta[1]
   attr(res, "pct.censored") <- mean(pct.censored)
   attr(res, "avg.cor") <- avg.cors
+  attr(res, "coverage") <- colMeans(coverage.store)
   class(res) <- "AFTsim"
   res
 }
@@ -499,10 +546,12 @@ createGrid <- function(U2X.range, U2Y.range, Z2X.range, n.data, sample.size, lam
 }
 
 simulateGrid <- function(est.eqns, grid, beta, seed = NULL, 
+                         B = 200L, conf.level = 0.95,
+                         bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
                          confounding.function = c("linear", "exponential", "square"),
                          break2sls = FALSE, break.method = c("collider", "error", "error.u"),
-                         error.amount = 0.01) {
+                         error.amount = 0.01, use.uniroot = TRUE) {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
   results <- array(0, dim = c(length(est.eqns), nrow(grid), (ncol(grid) + 12)))
@@ -512,7 +561,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
   
   #simulate situation when there IS a confounder present for
   #varying levels of correlation between U and X and U and Y
-  if (length(beta) == 1) {
+  if (length(beta) == 1 & use.uniroot) {
     raw.results <- foreach(i = 1:nrow(grid), .packages = packages) %dopar% {
       print(sprintf("Simulation %g / %g", i, nrow(grid)))
       res <- SimIVDataCompareEstimators(type = est.eqns, n.sims = grid$n.data[i], 
@@ -521,6 +570,8 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                         conf.corr.Y = grid$Conf.Corr.Y[i], 
                                         instrument.strength = grid$Instrument.Strength[i], 
                                         lambda = grid$lambda[i], beta0 = 0, beta1 = beta, seed = seed,
+                                        B = B, conf.level = conf.level,
+                                        bootstrap = bootstrap, boot.method = boot.method,
                                         survival.distribution = survival.distribution, break2sls = break2sls,
                                         break.method = break.method, error.amount = error.amount)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
@@ -535,6 +586,8 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                                 conf.corr.Y = grid$Conf.Corr.Y[i], 
                                                 instrument.strength = grid$Instrument.Strength[i], 
                                                 lambda = grid$lambda[i], beta = beta, seed = seed,
+                                                B = B, conf.level = conf.level,
+                                                bootstrap = bootstrap, boot.method = boot.method,
                                                 survival.distribution = survival.distribution)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res

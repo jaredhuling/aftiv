@@ -124,3 +124,84 @@ bootstrapVar <- function(fitted.obj, data,
   
   bs
 }
+
+
+
+bootstrapVarEstEqn <- function(est, data, 
+                               est.eqn, 
+                               method = c("ls", "sv", "full.bootstrap"), 
+                               B = 1000L) {
+  # takes a fitted aft.fit object and computes estimated variance using
+  # a bootstrap approach. supports 2 fast multiplier boostrap techniques
+  # in addition to traditional boostrap estimate
+  
+  method <- match.arg(method)
+  stopifnot(class(data) == "survival.data")
+  stopifnot(class(fitted.obj) == "aft.fit")
+  
+  
+  
+  conf.x.loc <- match(fitted.obj$confounded.x.names, colnames(data$X))
+  ZXmat <- data$X
+
+  
+  if (attr(est.eqn, "name") == "AFT2SLSScorePre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre"
+      | attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") {
+    #if 2SLS is used, replace Z with Xhat 
+    Z <- as.matrix(data$Z)
+    if (attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") {
+      for (v in 1:ncol(data$X)) {
+        data$X[,v] <- lm(data$X[,v] ~ Z)$fitted.values
+      }
+    } else {
+      for (v in 1:length(conf.x.loc)) {
+        dat.lm <- data.frame(response = data$X[,conf.x.loc[v]], predictor = Z)
+        Xhat <- lm(response ~ predictor, data = dat.lm)$fitted.values
+        data$X[,conf.x.loc[v]] <- Xhat
+      }
+    }
+    if (attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") {
+      est.eqn <- AFTScoreSmoothPre
+      attr(est.eqn, "name") <- "AFTScoreSmoothPre"
+    } else {
+      est.eqn <- AFTScorePre
+      attr(est.eqn, "name") <- "AFTScorePre"
+    }
+    
+    
+    
+  } else {
+    ZXmat[,conf.x.loc] <- data$Z
+  }
+  
+  if (method == "ls") {
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
+      #generate function G_c() for ICPW 
+      GC <- genKMCensoringFunc(data$survival)
+      bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, GC = GC)
+    } else {
+      bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
+    }
+    
+  } else if (method == "sv") {
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
+      #generate function G_c() for ICPW 
+      GC <- genKMCensoringFunc(data$survival)
+      bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, GC = GC)
+    } else {
+      bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
+                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
+    }
+  } else {
+    stop("method not supported yet")
+  }
+  
+  bs
+}
