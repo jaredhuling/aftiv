@@ -554,10 +554,10 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                          error.amount = 0.01, use.uniroot = TRUE) {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
-  results <- array(0, dim = c(length(est.eqns), nrow(grid), (ncol(grid) + 12)))
+  results <- array(0, dim = c(length(est.eqns), nrow(grid), (ncol(grid) + 13)))
   dimnames(results)[[1]] <- est.eqns
   dimnames(results)[[3]] <- c(colnames(grid), "Cor.U.Y", "Cor.U.X", "Cor.Z.X", "Mean", 
-                              "LCI", "UCI", "sd", "Q2.5", "Q5", "Med", "Q95", "Q97.5")
+                              "LCI", "UCI", "sd", "Q2.5", "Q5", "Med", "Q95", "Q97.5", "Coverage")
   
   #simulate situation when there IS a confounder present for
   #varying levels of correlation between U and X and U and Y
@@ -596,9 +596,10 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
   sum.results <- lapply(raw.results, function(res) {
     cors <- c(attr(res, "avg.cor")[3,4], attr(res, "avg.cor")[2,4], attr(res, "avg.cor")[1,2])
     cors <- matrix(rep(cors,length(est.eqns)), ncol = length(cors), byrow = T)
-    cbind(cors, as.matrix(summary(res)[,2:10]))
+    coverages <- attr(res, "coverage")
+    cbind(cors, as.matrix(summary(res)[,2:10]), coverages)
   })
-  for (i in 1:length(sum.results)) {results[, i, (ncol(grid) + 1):(ncol(grid) + 12)] <- sum.results[[i]]}
+  for (i in 1:length(sum.results)) {results[, i, (ncol(grid) + 1):(ncol(grid) + 13)] <- sum.results[[i]]}
   for (i in 1:dim(results)[1]){results[i, , (1:ncol(grid))] <- as.matrix(grid)}
   return.results <- list(raw = raw.results, summary.array = results)
   class(return.results) <- "simulation.grid"
