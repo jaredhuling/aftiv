@@ -407,7 +407,7 @@ SimIVDataCompareEstimatorsMultivar <- function(type, n.sims, sample.size, conf.c
   #check to make sure user specified allowed estimating equations
   types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW")
   funcs <- c("AFTScorePre", "AFTivScorePre", "AFT2SLSScorePre", "AFTivIPCWScorePre")
-  funcs.sm <- c("AFTScoreSmoothPre", "AFTivScoreSmoothPre", "AFT2SLSScoreSmoothPre")
+  funcs.sm <- c("AFTScoreSmoothPre", "AFTivScoreSmoothPre", "AFT2SLSScoreSmoothPre", "AFT2SLSScoreSmoothPre")
   for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
   
