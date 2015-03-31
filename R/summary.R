@@ -1,4 +1,6 @@
-summary.aftfits <- function(object,  conf.int = 0.95, scale = 1, ...) {
+summary.aftfits <- function(object,  conf.int = 0.95, 
+                            models = 1:length(object$fit.objects), scale = 1, 
+                            return.summary = FALSE, ...) {
   aft <- object
   beta <- aft$beta
   if (is.null(aft$beta)) {   # Null model
@@ -9,11 +11,14 @@ summary.aftfits <- function(object,  conf.int = 0.95, scale = 1, ...) {
   if(is.null(beta) | is.null(aft$se))
     stop("Input is not valid")
   se <- aft$se
-  n.fits <- length(aft$fit.objects)
+  n.fits <- length(models)
   
   rval.list <- vector(mode = "list", length = n.fits)
-
-  for (i in 1:n.fits) {
+  names(rval.list) <- 1:n.fits
+  
+  k <- 0
+  for (i in models) {
+    k <- k + 1
     rval <- list(call=aft$Call, #fail=aft$fail, na.action=aft$na.action,
                  n=aft$fit.objects[[i]]$nobs)
     #if (!is.null(aft$nevent)) rval$nevent <- aft$nevent
@@ -42,7 +47,8 @@ summary.aftfits <- function(object,  conf.int = 0.95, scale = 1, ...) {
     cat("*********************", "\n\n")
     cat("Method:", names(aft$fit.objects)[i], "\n\n")
     print(rval)
-    rval.list[[i]] <- rval
+    names(rval.list)[k] <- names(aft$fit.objects)[i]
+    rval.list[[k]] <- rval
   }
   
     df <- length(beta2)
@@ -72,8 +78,9 @@ summary.aftfits <- function(object,  conf.int = 0.95, scale = 1, ...) {
   #}
   
   
-
-  #rval.list
+  if (return.summary) {
+    return(rval.list)
+  }
 }
 
 
