@@ -100,13 +100,13 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   if (break2sls & break.method == "error") {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) + exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) + (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
+                exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
   } else {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) + exp(U2XCoef * U) + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) + (U2XCoef * U)^2 + rnorm(N, sd = 1))
+                exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + rnorm(N, sd = 1),
+                square = (Z2XCoef * Z) * (U2XCoef * U)^2 + rnorm(N, sd = 1))
   }
   #X <- X / sd(X)
   
@@ -298,7 +298,8 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                        lambda, beta0, beta1, seed = NULL, norta=F, 
                                        B = 200L, conf.level = 0.95,
                                        bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
-                                       survival.distribution = c("exponential", "normal"), break2sls = FALSE,
+                                       survival.distribution = c("exponential", "normal"), 
+                                       confounding.function, break2sls = FALSE,
                                        break.method = c("collider", "error", "error.u"), error.amount = 0.01){
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
@@ -314,9 +315,9 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
   funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScore", "vEvalAFTivIPCWScore", "vEvalAFT2SLSxhatScore")
   for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
-  if (bootstrap) {
-    warning("Bootstrap does not work yet")
-  }
+  #if (bootstrap) {
+    #warning("Bootstrap does not work yet")
+  #}
   
   zval <- qnorm((1 + conf.level)/2, 0, 1)
   
@@ -333,6 +334,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                      instrument.strength = instrument.strength, lambda = lambda, 
                                      beta0 = beta0, beta1=beta1, norta = F,
                                      survival.distribution = survival.distribution, 
+                                     confounding.function = confounding.function,
                                      break2sls = break2sls, break.method = break.method,
                                      error.amount = error.amount)
 
@@ -572,7 +574,8 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                         lambda = grid$lambda[i], beta0 = 0, beta1 = beta, seed = seed,
                                         B = B, conf.level = conf.level,
                                         bootstrap = bootstrap, boot.method = boot.method,
-                                        survival.distribution = survival.distribution, break2sls = break2sls,
+                                        survival.distribution = survival.distribution, 
+                                        confounding.function = confounding.function, break2sls = break2sls,
                                         break.method = break.method, error.amount = error.amount)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res

@@ -141,6 +141,7 @@ aftfit <- function(formula,
     #solve for beta using deriv-free spectral method
     est <- repFitAFT(tol = dfsane.tol, data = surv.dat, est.eqn = est.eqn, est.eqn.sm = est.eqn.sm,
                      instrument.names = NULL, confounded.x.names = confounded.x.names, 
+                     maxit = maxit,
                      fit.method = "dfsane", init.par = init.par, final.fit = smoothed,
                      method = c(2), control = BB.control, quiet = quiet)
     
