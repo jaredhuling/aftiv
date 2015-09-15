@@ -4,11 +4,17 @@ lsBootstrap <- function(beta, esteqn, B, nobs, ...) {
   p <- length(beta)
   Zb <- matrix(rnorm(p * B), ncol = p)
   Un1 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+  if (p == 1) {
+    Un1 <- t(Un1)
+  }
   AA <- lm.fit(y = Un1, x = Zb)$coefficients
 
   Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
   
   Un2 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+  if (p == 1) {
+    Un2 <- t(Un2)
+  }
   
   V <- var(Un2)
   
@@ -23,16 +29,21 @@ lsBootstrap <- function(beta, esteqn, B, nobs, ...) {
 
 svBootstrap <- function(beta, esteqn, B, nobs, ...) {
   p <- length(beta)
-  
   Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
   
   Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+  if (p == 1) {
+    Un1 <- t(Un1)
+  }
   
   V <- var(Un1)
   
   Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
   
   Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+  if (p == 1) {
+    Un2 <- t(Un2)
+  }
   
   sigma.hat <- solve(var(Un2))
   
@@ -41,6 +52,52 @@ svBootstrap <- function(beta, esteqn, B, nobs, ...) {
   list(se.hat = se.hat, var = sigma.hat, V = V)  
 }
 
+bootstrapVarUnivar <- function(est, est.eqn, data, 
+                               method = c("ls", "sv", "full.bootstrap"), 
+                               B = 1000L, GC) {
+  # takes a fitted aft.fit object and computes estimated variance using
+  # a bootstrap approach. supports 2 fast multiplier boostrap techniques
+  # in addition to traditional boostrap estimate
+  
+  method <- match.arg(method)
+  
+  #stopifnot(class(data) == "survival.data")  
+  
+  
+  #conf.x.loc <- match(fitted.obj$confounded.x.names, colnames(data$X))
+  #ZXmat <- data$X
+  
+  if (is.null(nrow(data$X))) {
+    nobs <- length(data$X)
+  } else {
+    nobs <- nrow(data$X)
+  }
+    
+  
+  if (method == "ls") {
+    if (attr(est.eqn, "name") == "evalAFTivIPCWScorePrec") {
+      bs <- lsBootstrap(beta = est, esteqn = est.eqn, 
+                        B = B, nobs = nobs, data.simu = data, GC = GC)
+    } else {
+      bs <- lsBootstrap(beta = est, esteqn = est.eqn, 
+                        B = B, nobs = nobs, data.simu = data)
+    }
+    
+  } else if (method == "sv") {
+    if (attr(est.eqn, "name") == "evalAFTivIPCWScorePrec") {
+      bs <- svBootstrap(beta = est, esteqn = est.eqn, 
+                        B = B, nobs = nobs, data.simu = data, GC = GC)
+    } else {
+      bs <- svBootstrap(beta = est, esteqn = est.eqn, 
+                        B = B, nobs = nobs, data.simu = data)
+    }
+    
+  } else {
+    stop("method not supported yet")
+  }
+  
+  bs
+}
 
 bootstrapVar <- function(fitted.obj, data, 
                          method = c("ls", "sv", "full.bootstrap"), 

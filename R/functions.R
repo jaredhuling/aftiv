@@ -63,7 +63,7 @@ norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.st
 
 genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
-                      confounding.function = c("linear", "exponential", "square"),
+                      confounding.function = c("linear", "inverted", "exponential", "square"),
                       break2sls = FALSE, break.method = c("collider", "error", "error.u"), error.amount = 0.01) {
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
@@ -100,25 +100,28 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   if (break2sls & break.method == "error") {
     X <- switch(confounding.function,
                 linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                inverted = (Z2XCoef * Z / abs(sin(Z))) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
                 exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
                 square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
   } else {
     X <- switch(confounding.function,
-                linear = (Z2XCoef * Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) * (U2XCoef * U)^2 + rnorm(N, sd = 1))
+                linear = Z2XCoef /(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
+                inverted = Z2XCoef * Z /abs(sin(Z)) + (U2XCoef * U) + rnorm(N, sd = 1),
+                exponential = Z2XCoef * exp(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
+                square = Z2XCoef * (Z + sin(Z * 3)) + (U2XCoef * U) + rnorm(N, sd = 1))
+    X <- X/sd(X)
   }
   #X <- X / sd(X)
   
   if (!break2sls) {
     Y <- switch(surv.dist,
                 exponential = rexp(N, rate = exp(-(beta0 + beta1 * X + U2YCoef * U))),
-                normal = exp(beta0 + beta1 * X + U2YCoef * U + err))
+                normal = exp( ( beta0 + beta1 * X + U2YCoef * U + err) ))
   } else {
     if (break.method == "error" | break.method == "error.u") {
       Y <- exp(beta0 + beta1 * X + U2YCoef * U + err)
     } else {
-      Y <- exp(beta0 + beta1 * X + err)
+      Y <- exp(beta0 + beta1 * X + U2YCoef * U + err)
     }
   }
 
@@ -209,7 +212,7 @@ roughResidSDEstAFT <- function(dat) {
 simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instrument.strength, 
                               lambda, beta0, beta1, verbose = F, norta = F,
                               survival.distribution = c("exponential", "normal"),
-                              confounding.function = c("linear", "exponential", "square"),
+                              confounding.function = c("linear", "inverted", "exponential", "square"),
                               break2sls = FALSE, break.method = c("collider", "error", "error.u"),
                               error.amount = 0.01) {
   #conf.corr.X == confounder correlation with X
@@ -312,7 +315,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
   
   #check to make sure user specified allowed estimating equations
   types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW", "AFT-2SLS-xhat")
-  funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScore", "vEvalAFTivIPCWScore", "vEvalAFT2SLSxhatScore")
+  funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScorePrec", "vEvalAFTivIPCWScorePrec", "vEvalAFT2SLSxhatScore")
   for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
   #if (bootstrap) {
@@ -346,13 +349,26 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
         #return correct estimating equation function
         est.eqn <- match.fun(funcs[[match(type[e], types)]])
         
-        #solve for beta using bisection method
-        beta.tmp[e] <- uniroot(est.eqn, interval = c(beta1 - 3, beta1 + 3), tol = 0.001, "data.simu" = Data.simu)$root
+        if (type[e] == "AFT-2SLS") {
+          #predict X with Z (1st stage of 2SLS process) to get Xhat
+          Data.simu$X.hat <- lm(X ~ Z, data = Data.simu)$fitted.values
+        }
+        if (type[e] == "AFT-IPCW") {
+          #generate function G_c() for ICPW
+          GC <- genKMCensoringFunc(Data.simu)
+          #solve for beta using bisection method
+          beta.tmp[e] <- uniroot(est.eqn, interval = c(beta1 - 3, beta1 + 3), tol = 0.001, "data.simu" = Data.simu, "GC" = GC)$root
+        } else {
+          GC <- NULL
+          #solve for beta using bisection method
+          beta.tmp[e] <- uniroot(est.eqn, interval = c(beta1 - 3, beta1 + 3), tol = 0.001, "data.simu" = Data.simu)$root
+        }
+
         
         
         if (bootstrap) {
           # bootstrap estimate
-          se.hat <- bootstrapVar(est, Data.simu, B = B, method = boot.method)$se.hat
+          se.hat <- bootstrapVarUnivar(beta.tmp[e], est.eqn, Data.simu, B = B, method = boot.method, GC = GC)$se.hat
           
           tmp <- c(beta.tmp[e] - zval * se.hat,
                    beta.tmp[e] + zval * se.hat)
@@ -551,7 +567,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                          B = 200L, conf.level = 0.95,
                          bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
-                         confounding.function = c("linear", "exponential", "square"),
+                         confounding.function = c("linear", "inverted", "exponential", "square"),
                          break2sls = FALSE, break.method = c("collider", "error", "error.u"),
                          error.amount = 0.01, use.uniroot = TRUE) {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
@@ -600,6 +616,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
     cors <- c(attr(res, "avg.cor")[3,4], attr(res, "avg.cor")[2,4], attr(res, "avg.cor")[1,2])
     cors <- matrix(rep(cors,length(est.eqns)), ncol = length(cors), byrow = T)
     coverages <- attr(res, "coverage")
+    print(round(print(attr(res, "avg.cor")), 4))
     cbind(cors, as.matrix(summary(res)[,2:10]), coverages)
   })
   for (i in 1:length(sum.results)) {results[, i, (ncol(grid) + 1):(ncol(grid) + 13)] <- sum.results[[i]]}
