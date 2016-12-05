@@ -1,60 +1,264 @@
 
 
-lsBootstrap <- function(beta, esteqn, B, nobs, ...) {
+lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.riskFunc = NULL, ...) {
   p <- length(beta)
-  Zb <- matrix(rnorm(p * B), ncol = p)
-  Un1 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+
+  
+  is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
+    attr(esteqn, "name") == "AFTivIPCWScorePre"
+  
+  Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
+  if (is.ipcw) {
+    #Un2 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, GC = GC, ...) ))
+    
+    #varG <- VarFunc(time.t)
+    #n.risk <- n.riskFunc(time.t)
+    #idx.nnan <- !is.nan(varG)
+    #varG <- (sum(delta[idx.nnan]*varG[idx.nnan]^2) ) * nobs #* sum(delta[idx.nnan]==1) #* nobs #sum(delta[idx.nnan]==1) #) #* sum(delta[idx.nnan]==1) # #
+    ##* sqrt(nobs) # * nobs # * nobs
+    ##print(varG)
+    ##varG <- 0
+    #print("varg1")
+    #print(varG)
+    
+    #biases.sum <- rep(NA, B)
+    #for (i in 1:B) {
+    #  samp.idx <- sample.int(length(time.t), length(time.t), replace = TRUE)
+    #  sfb <- survfit(Surv(time.t[samp.idx], delta[samp.idx]) ~ 1)
+    #  serv <- summary(sfb)$surv 
+    #  
+    #  dfsurv = data.frame(c(0, summary(sfb)$time), c(serv[1], serv)); 
+    #  tmpFuncSurv <- stepfun(dfsurv[,1], c(dfsurv[1,2],dfsurv[,2]), f=0);
+    #  biases <- tmpFuncSurv(time.t[samp.idx][which(delta[samp.idx]==1)]) #- 1+pexp(obs.time[which(status==1)], 1)
+    #  #biases <- tmpFuncSurv(obs.time)
+    #  #biases[which(is.nan(biases))] <- cur.vars[which(is.nan(biases))-5]
+    #  biases.sum[i] <- sum(biases)
+    #  #rmeans[i] <- summary(sfb, rmean=TRUE)$table[["*rmean"]]
+    #}
+    
+    #varG <- var(biases.sum)
+    #print("varg2")
+    #print(varG)
+    
+    Un2 <- array(NA, dim = c(B, p) )
+    if (attr(esteqn, "name") == "evalAFTivIPCWScorePrec") {
+      data <- list(...)[["data.simu"]]
+      
+      for (i in 1:B) {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot <- genKMCensoringFunc(data[samp.idx,])
+        Un2[i,] <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
+      }
+    } else {
+      list.dat <- list(...)
+      survival <- list.dat[["survival"]]
+      X <- list.dat[["X"]]
+      ZXmat <- list.dat[["ZXmat"]]
+      conf.x.loc <- list.dat[["conf.x.loc"]]
+      
+      for (i in 1:B) {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot <- genKMCensoringFunc(survival[samp.idx,])
+        Un2[i,] <- esteqn(beta = beta, GC = GC.boot, survival = survival[samp.idx,],
+                          X = X[samp.idx,], ZXmat = ZXmat[samp.idx,], conf.x.loc = conf.x.loc)
+      }
+    }
+    
+  } else {
+    Un2 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+    if (p == 1) {
+      Un2 <- t(Un2)
+    }
+  }
+  V <- var(Un2)
+ 
+  if (p == 1) {
+    rt <- as.numeric(sqrt(V))
+    if (is.ipcw) {
+      cat("V:", V, "\n")
+      print(rt)
+      print(1/rt)
+      Zb <- (1/rt) * (matrix(2 * rbinom(p * B, 1, 0.5) - 1, ncol = p))
+    } else {
+      Zb <- (1/rt) * (matrix(rnorm(p * B), ncol = p))
+    }
+    #Zb <- rt * (matrix(2 * rnorm(p * B) - 1, ncol = p))
+  } else {
+    if (is.ipcw) {
+      eeg <- eigen(V)
+      rt <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
+      Zb <- t(rt %*% t(matrix(rnorm(p * B), ncol = p)))
+    } else  {
+      Zb <- matrix(rnorm(p * B), ncol = p)
+    }
+  }
+  
+
+  #Zb <- matrix(rnorm(p * B, sd = nobs^0.35), ncol = p)
+  
+  
+  
+  
+  if (is.ipcw) {
+    #time.t <- list(...)[["data.simu"]]
+    delta <- data$delta
+    time.t <- data$t
+    Un1 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), GC = GC, ...) ))
+  } else {
+    Un1 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+  }
+  
   if (p == 1) {
     Un1 <- t(Un1)
   }
   AA <- lm.fit(y = Un1, x = Zb)$coefficients
-
-  Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
-  
-  Un2 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
-  if (p == 1) {
-    Un2 <- t(Un2)
-  }
-  
-  V <- var(Un2)
-  
   AA.inv <- solve(AA)
   
-  variance <- AA.inv %*% V %*% t(AA.inv)
+  
+  if (is.ipcw) {
+    
+    #VG <- varG * diag(ncol(V))
+    #V <- V + VG
+    #print(VG)
+    #print(sqrt(V/nobs))
+    variance <- AA.inv %*% V %*% t(AA.inv)
+    
+    #print(variance)
+    #variance <- variance + VG
+    #print(VG)
+  } else {
+    variance <- AA.inv %*% V %*% t(AA.inv)
+  }
+    
   
   se.hat <- sqrt(diag(variance)) / sqrt(nobs)
+  
+  #print(attr(esteqn, "name"))
+  #cat("The est: ", beta, "\n")
+  #print("The se: ")
+  #print(se.hat)
   
   list(se.hat = se.hat, var = variance, A = AA, V = V)
 }
 
-svBootstrap <- function(beta, esteqn, B, nobs, ...) {
+svBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...) {
   p <- length(beta)
   Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
   
-  Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+  is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
+    attr(esteqn, "name") == "AFTivIPCWScorePre"
+  
+  if (is.ipcw) {
+    #time.t <- list(...)[["data.simu"]]$t
+    #Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, GC = GC, ...) ))
+    
+    
+    #print("ipcw var1")
+    #print(var(t(Un1) ))
+    
+    Un1 <- array(NA, dim = c(B, p) )
+    if (attr(esteqn, "name") == "evalAFTivIPCWScorePrec") {
+      data <- list(...)[["data.simu"]]
+      
+      for (i in 1:B) {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot <- genKMCensoringFunc(data[samp.idx,])
+        Un1[i,] <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
+      }
+    } else {
+      list.dat <- list(...)
+      survival <- list.dat[["survival"]]
+      X <- list.dat[["X"]]
+      ZXmat <- list.dat[["ZXmat"]]
+      conf.x.loc <- list.dat[["conf.x.loc"]]
+      
+      for (i in 1:B) {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot <- genKMCensoringFunc(survival[samp.idx,])
+        Un1[i,] <- esteqn(beta = beta, GC = GC.boot, survival = survival[samp.idx,],
+                          X = X[samp.idx,], ZXmat = ZXmat[samp.idx,], conf.x.loc = conf.x.loc)
+      }
+    }
+    #varG <- VarFunc(time.t)
+    #varG <- sum(varG[!is.nan(varG)]^2) * nobs * nobs
+  } else {
+    Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+    if (p == 1) {
+      Un1 <- t(Un1)
+    }
+  }
+    
+
+  if (is.ipcw) {
+    V <- var(Un1)
+    #VG <- varG * diag(ncol(V))
+    #V <- V + VG
+  } else {
+    V <- var(Un1)
+  }
+  print(attr(esteqn, "name"))
+  #print(V)
+  #print(solve(V))
+  ##############Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
+  
   if (p == 1) {
-    Un1 <- t(Un1)
+    rt <- as.numeric(sqrt(V))
+    if (is.ipcw) {
+      cat("V:", V, "\n")
+      print(rt)
+      print(1/rt)
+      Zb <- (1/rt) * (matrix(4 * rbinom(p * B, 1, 0.5) - 2, ncol = p))
+      #Zb <- (1/rt) * (matrix(runif(p * B, min=-2, max=2), ncol = p))
+      #Zb <- (1/rt) * (matrix(rt(p * B, df = 2), ncol = p))
+      Zb <- (2/(rt * (log(nobs)^(0.525)))  ) * (matrix(rnorm(p * B), ncol = p))
+    } else {
+      cat("V:", V, "\n")
+      Zb <- (1/rt) * (matrix(rnorm(p * B), ncol = p))
+    }
+    #Zb <- rt * (matrix(2 * rnorm(p * B) - 1, ncol = p))
+  } else {
+    eeg <- eigen(V)
+    rt <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
+    if (is.ipcw) {
+      #Zb <- 2 * t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))/(log(nobs)^(0.525))
+      Zb <- t(rt %*% t(3 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1.5))/(log(log(nobs)) )
+      #Zb <- 2 * t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+    } else {
+      Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+    }
   }
   
-  V <- var(Un1)
+  if (is.ipcw) {
+    Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs),  GC = GC, ...) ))
+    
+  } else {
+    Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+  }
   
-  Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
-  
-  Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
   if (p == 1) {
     Un2 <- t(Un2)
   }
   
   sigma.hat <- solve(var(Un2))
+  if (is.ipcw) {
+    sigma.hat <- sigma.hat
+    se.hat <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  } else {
+    se.hat <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  }
+  cat("The est: ", beta, "\n")
+  print("The variance: ")
+  print(se.hat)
   
-  se.hat <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  
+  
   
   list(se.hat = se.hat, var = sigma.hat, V = V)  
 }
 
 bootstrapVarUnivar <- function(est, est.eqn, data, 
                                method = c("ls", "sv", "full.bootstrap"), 
-                               B = 1000L, GC) {
+                               B = 1000L, GC = NULL, VarFunc = NULL, n.riskFunc = NULL) {
   # takes a fitted aft.fit object and computes estimated variance using
   # a bootstrap approach. supports 2 fast multiplier boostrap techniques
   # in addition to traditional boostrap estimate
@@ -62,7 +266,6 @@ bootstrapVarUnivar <- function(est, est.eqn, data,
   method <- match.arg(method)
   
   #stopifnot(class(data) == "survival.data")  
-  
   
   #conf.x.loc <- match(fitted.obj$confounded.x.names, colnames(data$X))
   #ZXmat <- data$X
@@ -77,16 +280,18 @@ bootstrapVarUnivar <- function(est, est.eqn, data,
   if (method == "ls") {
     if (attr(est.eqn, "name") == "evalAFTivIPCWScorePrec") {
       bs <- lsBootstrap(beta = est, esteqn = est.eqn, 
-                        B = B, nobs = nobs, data.simu = data, GC = GC)
+                        B = B, nobs = nobs, GC = GC, VarFunc = VarFunc, 
+                        n.riskFunc = n.riskFunc, data.simu = data)
     } else {
       bs <- lsBootstrap(beta = est, esteqn = est.eqn, 
-                        B = B, nobs = nobs, data.simu = data)
+                        B = B, nobs = nobs, GC = NULL, VarFunc = NULL, 
+                        n.riskFunc = NULL, data.simu = data)
     }
     
   } else if (method == "sv") {
     if (attr(est.eqn, "name") == "evalAFTivIPCWScorePrec") {
       bs <- svBootstrap(beta = est, esteqn = est.eqn, 
-                        B = B, nobs = nobs, data.simu = data, GC = GC)
+                        B = B, nobs = nobs, data.simu = data, GC = GC, VarFunc = VarFunc)
     } else {
       bs <- svBootstrap(beta = est, esteqn = est.eqn, 
                         B = B, nobs = nobs, data.simu = data)
@@ -155,8 +360,8 @@ bootstrapVar <- function(fitted.obj, data,
       #generate function G_c() for ICPW 
       GC <- genKMCensoringFunc(data$survival)
       bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
-                        X = data$X, ZXmat = ZXmat, GC = GC)
+                        B = B, nobs = fitted.obj$nobs, GC = GC, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, conf.x.loc = conf.x.loc)
     } else {
       bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
                         B = B, nobs = fitted.obj$nobs, survival = data$survival,
@@ -168,8 +373,8 @@ bootstrapVar <- function(fitted.obj, data,
       #generate function G_c() for ICPW 
       GC <- genKMCensoringFunc(data$survival)
       bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
-                        X = data$X, ZXmat = ZXmat, GC = GC)
+                        B = B, nobs = fitted.obj$nobs, GC = GC, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat, conf.x.loc = conf.x.loc)
     } else {
       bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
                         B = B, nobs = fitted.obj$nobs, survival = data$survival,
@@ -236,8 +441,8 @@ bootstrapVarEstEqn <- function(est, data,
       #generate function G_c() for ICPW 
       GC <- genKMCensoringFunc(data$survival)
       bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
-                        X = data$X, ZXmat = ZXmat, GC = GC)
+                        B = B, nobs = fitted.obj$nobs, GC = GC, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
     } else {
       bs <- lsBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
                         B = B, nobs = fitted.obj$nobs, survival = data$survival,
@@ -249,8 +454,8 @@ bootstrapVarEstEqn <- function(est, data,
       #generate function G_c() for ICPW 
       GC <- genKMCensoringFunc(data$survival)
       bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
-                        B = B, nobs = fitted.obj$nobs, survival = data$survival,
-                        X = data$X, ZXmat = ZXmat, GC = GC)
+                        B = B, nobs = fitted.obj$nobs, GC = GC, survival = data$survival,
+                        X = data$X, ZXmat = ZXmat)
     } else {
       bs <- svBootstrap(beta = fitted.obj$par, esteqn = est.eqn, 
                         B = B, nobs = fitted.obj$nobs, survival = data$survival,
