@@ -63,7 +63,7 @@ norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.st
 
 genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
-                      confounding.function = c("linear", "inverted", "exponential", "square"),
+                      confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                       break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"), 
                       error.amount = 0.01) {
   if (!is.numeric(N) | N < 1) 
@@ -109,11 +109,12 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                 square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
   } else {
     X <- switch(confounding.function,
-                linear = Z2XCoef /(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                inverted = Z2XCoef * Z /abs(sin(Z)) + (U2XCoef * U) + rnorm(N, sd = 1),
+                linear = Z2XCoef * Z + (U2XCoef * U) + rnorm(N, sd = 1),
+                inverted = Z2XCoef / Z + (U2XCoef * U) + rnorm(N, sd = 1),
                 exponential = Z2XCoef * exp(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                square = Z2XCoef * (Z + sin(Z * 3)) + (U2XCoef * U) + rnorm(N, sd = 1))
-    X <- X/sd(X)
+                sine = Z2XCoef * (Z + sin(Z * pi)) + (U2XCoef * U) + rnorm(N, sd = 1),
+                square = Z2XCoef * (Z^2) + (U2XCoef * U) + rnorm(N, sd = 1))
+    #X <- X/sd(X)
   }
   #X <- X / sd(X)
   
@@ -196,11 +197,13 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
     if (confounding.function == "linear") {
       X <- Z2XCoef * Z.append + U2XCoef * U.append + rand.mat
     } else if (confounding.function == "inverted") {
-      X <- Z2XCoef * Z.append /abs(sin(Z.append)) + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef / Z.append + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "exponential") {
       X <- Z2XCoef * exp(Z.append) + (U2XCoef * U.append) + rand.mat
+    } else if (confounding.function == "sin") {
+      X <- Z2XCoef * (Z.append + sin(Z.append * pi)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "square") {
-      X <- Z2XCoef * (Z.append + sin(Z.append * 3)) + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef * (Z.append^2) + (U2XCoef * U.append) + rand.mat
     } else {
       X <- Z2XCoef * Z.append + U2XCoef * U.append + rand.mat
     }
@@ -237,9 +240,10 @@ roughResidSDEstAFT <- function(dat) {
 
 
 simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instrument.strength, 
-                              lambda, beta0, beta1, verbose = F, norta = F,
+                              lambda, beta0, beta1, verbose = FALSE, norta = FALSE,
+                              betax.cens, betaz.cens,
                               survival.distribution = c("exponential", "normal"),
-                              confounding.function = c("linear", "inverted", "exponential", "square"),
+                              confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                               dependent.censoring = FALSE,
                               break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"),
                               error.amount = 0.01, cens.distribution = c("exp", "lognormal", "weibull")) {
@@ -250,6 +254,9 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
   confounding.function <- match.arg(confounding.function)
   break.method <- match.arg(break.method)
   cens.distribution <- match.arg(cens.distribution)
+  
+  stopifnot(length(beta1) == length(betax.cens))
+  stopifnot(length(betaz.cens) == 1)
   
   if (norta){
     #correlation matrix for U, Y
@@ -280,8 +287,8 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
     beta.x <- runif(NCOL(X), min = -0.5, max = 0.5)
     beta.z <- runif(1, min = -0.5, max = 0.5)
     
-    beta.z <- 0.5
-    beta.x <- 0.5
+    beta.z <- betaz.cens
+    beta.x <- betax.cens
     
     if (cens.distribution == "exp")
     {
@@ -347,7 +354,7 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
 simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y = 0, instrument.strength, 
                                       lambda, beta, survival.distribution = c("exponential", "normal"),
                                       num.confounded, intercept = FALSE, break2sls = FALSE,
-                                      confounding.function = c("linear", "inverted", "exponential", "square"),
+                                      confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                                       dependent.censoring = FALSE,
                                       cens.distribution = c("exp", "lognormal", "weibull")) {
   #conf.corr.X == confounder correlation with X
@@ -444,7 +451,8 @@ simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.
 
 
 SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength,
-                                       lambda, beta0, beta1, seed = NULL, norta=F, 
+                                       lambda, beta0, beta1, seed = NULL, norta=FALSE, 
+                                       betax.cens, betaz.cens,
                                        B = 200L, conf.level = 0.95,
                                        bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                                        survival.distribution = c("exponential", "normal"), 
@@ -484,6 +492,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
       Data.simu <- simIVSurvivalData(sample.size, conf.corr.X = conf.corr.X, conf.corr.Y = conf.corr.Y, 
                                      instrument.strength = instrument.strength, lambda = lambda, 
                                      beta0 = beta0, beta1=beta1, norta = FALSE,
+                                     betax.cens = betax.cens, betaz.cens = betaz.cens,
                                      survival.distribution = survival.distribution, 
                                      confounding.function = confounding.function,
                                      dependent.censoring = dependent.censoring,
@@ -743,9 +752,11 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                          bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
                          dependent.censoring = FALSE,
-                         confounding.function = c("linear", "inverted", "exponential", "square"),
+                         confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                          break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"),
                          error.amount = 0.01, use.uniroot = TRUE, 
+                         betax.cens,
+                         betaz.cens,
                          cens.distribution = c("exp", "lognormal", "weibull")) 
 {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
@@ -754,6 +765,10 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
   dimnames(results)[[1]] <- est.eqns
   dimnames(results)[[3]] <- c(colnames(grid), "Cor.U.Y", "Cor.U.X", "Cor.Z.X", "Mean", 
                               "LCI", "UCI", "sd", "Q2.5", "Q5", "Med", "Q95", "Q97.5", "Coverage")
+  
+  stopifnot(length(betax.cens) == length(beta))
+  
+  stopifnot(length(betaz.cens) == 1)
   
   #simulate situation when there IS a confounder present for
   #varying levels of correlation between U and X and U and Y
@@ -766,6 +781,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                         conf.corr.Y = grid$Conf.Corr.Y[i], 
                                         instrument.strength = grid$Instrument.Strength[i], 
                                         lambda = grid$lambda[i], beta0 = 0, beta1 = beta, seed = seed,
+                                        betax.cens = betax.cens, betaz.cens = betaz.cens,
                                         B = B, conf.level = conf.level,
                                         bootstrap = bootstrap, boot.method = boot.method,
                                         survival.distribution = survival.distribution, 
