@@ -186,7 +186,7 @@ AFTivScorePre <- function(beta, survival, X, ZXmat, multiplier.wts = NULL)
 }
 attr(AFTivScorePre, "name") <- "AFTivScorePre"
 
-AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.loc, multiplier.wts = NULL)
+AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf.x.loc, multiplier.wts = NULL)
 { 
   
   #the score function for the AFT model with instrumental variables and Inverse Probability Censoring Weighting
@@ -202,7 +202,13 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.
   }
   
   #creates G_c(T_i) term in the IPCW estimating equation
-  survival$GCT <- GC(exp(survival$log.t))
+  if (attr(GC, "cox"))
+  {
+    survival$GCT <- GC(exp(survival$log.t), X = data.matrix(cbind(X, Z)))
+  } else 
+  {
+    survival$GCT <- GC(exp(survival$log.t))
+  }
   
   #store the T_i - bX_i term (error)
   survival$err = survival$log.t - X %*% beta
@@ -226,7 +232,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.
   
   if (is.null(multiplier.wts)) {
     #first col is as.risk.terms, remaining are at.risk.Z.terms
-    at.risk.mat <- genIPCWNumDenomMultivar(survival, ZXmat, GC, conf.x.loc) #/ n
+    at.risk.mat <- genIPCWNumDenomMultivar(survival, ZXmat, Z, X, GC, conf.x.loc) #/ n
     
     #generate empty vector to return eventually
     ret.vec <- numeric(nvars)
@@ -234,7 +240,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.
       #return the score   
       if (i %in%  conf.x.loc) {
         ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.mat[,1] * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
+                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)  # at.risk.mat[,1]
       } else {
         ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
                             (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
@@ -243,7 +249,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.
   } else {
     ZXmatm <- ZXmat * multiplier.wts
     #first col is as.risk.terms, remaining are at.risk.Z.terms
-    at.risk.mat <- genIPCWNumDenomMultivar(survival, ZXmatm, GC, conf.x.loc) #/ n
+    at.risk.mat <- genIPCWNumDenomMultivar(survival, ZXmatm, Z, X, GC, conf.x.loc) #/ n
     
     #generate empty vector to return eventually
     ret.vec <- numeric(nvars)
@@ -251,7 +257,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, GC, conf.x.loc = conf.x.
       #return the score   
       if (i %in%  conf.x.loc) {
         ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.mat[,1] * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
+                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
       } else {
         ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
                             (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
@@ -329,10 +335,10 @@ AFTivScoreSmoothPre <- function(beta, survival, X, ZXmat, tau = 1e-3)
 
 attr(AFTivScoreSmoothPre, "name") <- "AFTivScoreSmoothPre"
 
-genIPCWNumDenomMultivar <- cmpfun(function(dat, Z, GC.func, conf.x.loc){
+genIPCWNumDenomMultivar <- cmpfun(function(dat, Zx, Z, X, GC.func, conf.x.loc){
   #dat is a data.frame
   #GC.func is a function
-  num.vars <- ncol(Z)
+  num.vars <- ncol(Zx)
   nrd <- nrow(dat)
   num <- denom <- array(0, dim = c(nrow(dat),1))
   idx <- 1:num.vars
@@ -341,7 +347,17 @@ genIPCWNumDenomMultivar <- cmpfun(function(dat, Z, GC.func, conf.x.loc){
   at.risk.list <- lapply(1:nrd, function(i) {
     err.i <- dat$err[i]
     ind.zero <- F
-    ipcw <- GC.func(exp(dat$bX[i:nrow(dat)] + err.i))
+    
+    
+    
+    if (attr(GC.func, "cox"))
+    {
+      ipcw <- GC.func(exp(dat$bX[i:nrow(dat)] + err.i), X = data.matrix(cbind(X, Z))[i:nrow(dat),])
+    } else 
+    {
+      ipcw <- GC.func(exp(dat$bX[i:nrow(dat)] + err.i))
+    }
+      
     if (all(ipcw == 0)){
       ipcw <- rep(0.00001, length(ipcw))
       ind.zero <- T
@@ -351,7 +367,7 @@ genIPCWNumDenomMultivar <- cmpfun(function(dat, Z, GC.func, conf.x.loc){
     if (!ind.zero){
       ret.vec[1] <- sum(1 / ipcw)
       for (j in conf.x.loc) {
-        ret.vec[j+1] <- sum(Z[i:nrd,j] / ipcw)
+        ret.vec[j+1] <- sum(Zx[i:nrd,j] / ipcw)
       }
       return (ret.vec)
     } else {
@@ -360,7 +376,7 @@ genIPCWNumDenomMultivar <- cmpfun(function(dat, Z, GC.func, conf.x.loc){
   })
   ret.mat <- do.call(rbind, at.risk.list)
   for (j in idx) {
-    ret.mat[,j+1] <- cumsumRev(Z[,j])
+    ret.mat[,j+1] <- cumsumRev(Zx[,j])
   }
   ret.mat
 })
@@ -609,26 +625,85 @@ genKMCensoringFuncVar <- function(data){
   list(dist = tmpFunc, var = tmpFuncVar, n.risk = nriskFunc)
 }
 
-genKMCensoringFunc <- function(data){
+genKMCensoringFunc <- function(data, cox = FALSE, X = NULL){
   #returns the G_c function for inverse probability censored weighting
   #by obtaining the Kaplan-Meier estimate for censoring and returning
   #a step function of the estimate
   require(survival)
   data$delta.G <- 1 - data$delta
-  if (is.null(data$t.original)) {
-    if (is.null(data$t)) {
-      cens.fit <- survfit(Surv(exp(log.t), delta.G) ~ 1, data = data)
+  if (!cox)
+  {
+    if (is.null(data$t.original)) {
+      if (is.null(data$t)) {
+        cens.fit <- survfit(Surv(exp(log.t), delta.G) ~ 1, data = data)
+        cens.dist <- data.frame(c(0, summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
+      } else {
+        cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
+        cens.dist <- data.frame(c(min(data$t), summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
+      }
     } else {
-      cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
+      cens.fit <- survfit(Surv(t.original, delta.G) ~ 1, data = data)
+      cens.dist <- data.frame(c(min(data$t.original), summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
     }
-  } else {
-    cens.fit <- survfit(Surv(t.original, delta.G) ~ 1, data = data)
+    
+    tmpFunc <- stepfun(cens.dist[,1], c(1,cens.dist[,2]), f=0)
+    attr(tmpFunc, "cox") <- FALSE
+  } else 
+  {
+    if(is.null(X)) stop("Must provide covariates X to be modeled if cox = TRUE")
+    
+    if (is.null(data$t.original)) {
+      if (is.null(data$t)) 
+      {
+        cph <- coxph(Surv(exp(data$log.t), data$delta.G) ~ X)
+        bh <- basehaz(cph)
+        baseline.survival <- exp(-bh$hazard)
+        cens.dist.cph <- data.frame(c(0, bh$time), 
+                                    c(1, baseline.survival))
+      } else 
+      {
+        cph <- coxph(Surv(data$t, data$delta.G) ~ X)
+        bh <- basehaz(cph)
+        baseline.survival <- exp(-bh$hazard)
+        cens.dist.cph <- data.frame(c(min(data$t), bh$time), 
+                                    c(1, baseline.survival))
+      }
+    } else {
+      cph <- coxph(Surv(data$t.original, data$delta.G) ~ X)
+      bh <- basehaz(cph)
+      baseline.survival <- exp(-bh$hazard)
+      cens.dist.cph <- data.frame(c(min(data$t.original), bh$time), 
+                                  c(1, baseline.survival))
+    }
+    
+    
+    # S_0(t) = exp(-Lambda(t))
+    # S(t | X) = S_0(t) ^ exp(x'beta)
+    
+    tmpFunc.cph <- stepfun(cens.dist.cph[,1], c(1,cens.dist.cph[,2]), f = 0)
+    
+    coef.cph <- coef(cph)
+    names(coef.cph) <- NULL
+    
+    ## return function to compute estimated not-censoring
+    ## probability conditional on x (covariates)
+    tmpFunc <- function(t, X)
+    {
+      if (is.matrix(X))
+      {
+        return( tmpFunc.cph(t) ^ exp(drop(X %*% coef.cph)) )
+      } else 
+      {
+        return( tmpFunc.cph(t) ^ exp(   sum(X * coef.cph)) )
+      }
+    }
+    
+    attr(tmpFunc, "cox") <- TRUE
   }
-  cens.dist <- data.frame(c(0, summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
-  #cens.var <- data.frame(c(0, summary(cens.fit)$time), c(1, summary(cens.fit)$std.err))
-  tmpFunc <- stepfun(cens.dist[,1], c(1,cens.dist[,2]), f=0)  
+  
   tmpFunc
 }
+
 
 genIPCWNumDenom <- cmpfun(function(dat, GC.func, multiplier.wts = NULL){
   #dat is a data.frame
@@ -653,7 +728,13 @@ genIPCWNumDenom <- cmpfun(function(dat, GC.func, multiplier.wts = NULL){
     #  denom.tmp <- denom.tmp + 1 / ipcw
     #}
     ind.zero <- F
-    ipcw <- GC.func(exp(bX[i:len] + err.i))
+    if (attr(GC.func, "cox"))
+    {
+      ipcw <- GC.func(exp(bX[i:len] + err.i), X = data.matrix(cbind(dat$X[i:len], dat$Z[i:len])))
+    } else 
+    {
+      ipcw <- GC.func(exp(bX[i:len] + err.i))
+    }
     if (all(ipcw == 0)){
       ipcw <- rep(0.0001, length(ipcw))
       ind.zero <- T
@@ -688,11 +769,19 @@ evalAFTivIPCWScorePrec <- function(data.simu, beta, GC, multiplier.wts = NULL)
   data.simu$bX <- beta * data.simu$X
   
   #creates G_c(T_i) term in the IPCW estimating equation
-  data.simu$GCT <- GC(exp(data.simu$t))
+  if (attr(GC, "cox"))
+  {
+    data.simu$GCT <- GC(exp(data.simu$t), X = data.matrix(cbind(data.simu$X, data.simu$Z)))
+  } else 
+  {
+    data.simu$GCT <- GC(exp(data.simu$t))
+  }
+  
+  at.risk.terms <- nrow(data.simu):1
   
   #sort according to error size ####observed failure time 
   #data.simu <- data.simu[order(data.simu$X),]   
-  ord.idx <- order(data.simu$err)
+  ord.idx   <- order(data.simu$err)
   data.simu <- data.simu[ord.idx,] 
   
   #create indicator to set to zero terms where GCT == 0 and 
@@ -711,8 +800,8 @@ evalAFTivIPCWScorePrec <- function(data.simu, beta, GC, multiplier.wts = NULL)
   
   if (is.null(multiplier.wts)) {
     #return the score   ##mean(data.simu$GCT) * 
-    return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * 
-                 (data.simu$IPCW.at.risk.terms * data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
+    return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
+                 (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
   } else {
     #return the score   ##mean(data.simu$GCT) * 
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * 

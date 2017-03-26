@@ -10,6 +10,7 @@ aftfit <- function(formula,
                    bootstrap = FALSE,
                    boot.method = c("ls", "sv", "full.bootstrap"),
                    B = 1000L,
+                   dependent.censoring = FALSE,
                    na.action, 
                    init = NULL, 
                    return.data=FALSE,
@@ -141,7 +142,7 @@ aftfit <- function(formula,
     #solve for beta using deriv-free spectral method
     est <- repFitAFT(tol = dfsane.tol, data = surv.dat, est.eqn = est.eqn, est.eqn.sm = est.eqn.sm,
                      instrument.names = NULL, confounded.x.names = confounded.x.names, 
-                     maxit = maxit,
+                     maxit = maxit, dependent.censoring = dependent.censoring,
                      fit.method = "dfsane", init.par = init.par, final.fit = smoothed,
                      method = c(2), control = BB.control, quiet = quiet)
     

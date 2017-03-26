@@ -345,25 +345,83 @@ genIPCWNumDenomSlower <- cmpfun(function(dat, GC.func){
   dat
 })
 
-genKMCensoringFunc <- function(data){
-  #returns the G_c function for inverse probability censored weighting
-  #by obtaining the Kaplan-Meier estimate for censoring and returning
-  #a step function of the estimate
-  require(survival)
-  data$delta.G <- 1 - data$delta
-  if (is.null(data$t.original)) {
-    if (is.null(data$t)) {
-      cens.fit <- survfit(Surv(exp(log.t), delta.G) ~ 1, data = data)
-    } else {
-      cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
-    }
-  } else {
-    cens.fit <- survfit(Surv(t.original, delta.G) ~ 1, data = data)
-  }
-  cens.dist <- data.frame(c(0, summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
-  tmpFunc <- stepfun(cens.dist[,1], c(1,cens.dist[,2]), f=0)
-  tmpFunc
-}
+# genKMCensoringFunc <- function(data, cox = FALSE, X = NULL){
+#   #returns the G_c function for inverse probability censored weighting
+#   #by obtaining the Kaplan-Meier estimate for censoring and returning
+#   #a step function of the estimate
+#   require(survival)
+#   data$delta.G <- 1 - data$delta
+#   if (!cox)
+#   {
+#     if (is.null(data$t.original)) {
+#       if (is.null(data$t)) {
+#         cens.fit <- survfit(Surv(exp(log.t), delta.G) ~ 1, data = data)
+#         cens.dist <- data.frame(c(0, summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
+#       } else {
+#         cens.fit <- survfit(Surv(t, delta.G) ~ 1, data = data)
+#         cens.dist <- data.frame(c(min(data$t), summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
+#       }
+#     } else {
+#       cens.fit <- survfit(Surv(t.original, delta.G) ~ 1, data = data)
+#       cens.dist <- data.frame(c(min(data$t.original), summary(cens.fit)$time), c(1, summary(cens.fit)$surv))
+#     }
+#     
+#     tmpFunc <- stepfun(cens.dist[,1], c(1,cens.dist[,2]), f=0)
+#     attr(tmpFunc, "cox") <- FALSE
+#   } else 
+#   {
+#     if(is.null(X)) stop("Must provide covariates X to be modeled if cox = TRUE")
+#     
+#     if (is.null(data$t.original)) {
+#       if (is.null(data$t)) 
+#       {
+#         cph <- coxph(Surv(exp(data$log.t), data$delta.G) ~ X)
+#         bh <- basehaz(cph)
+#         baseline.survival <- exp(-bh$hazard)
+#         cens.dist.cph <- data.frame(c(0, bh$time), 
+#                                     c(1, baseline.survival))
+#       } else 
+#       {
+#         cph <- coxph(Surv(data$t, data$delta.G) ~ X)
+#         bh <- basehaz(cph)
+#         baseline.survival <- exp(-bh$hazard)
+#         cens.dist.cph <- data.frame(c(min(data$t), bh$time), 
+#                                     c(1, baseline.survival))
+#       }
+#     } else {
+#       cph <- coxph(Surv(data$t.original, data$delta.G) ~ X)
+#       bh <- basehaz(cph)
+#       baseline.survival <- exp(-bh$hazard)
+#       cens.dist.cph <- data.frame(c(min(data$t.original), bh$time), 
+#                                   c(1, baseline.survival))
+#     }
+#     
+#     
+#     # S_0(t) = exp(-Lambda(t))
+#     # S(t | X) = S_0(t) ^ exp(x'beta)
+#     
+#     tmpFunc.cph <- stepfun(cens.dist.cph[,1], c(1,cens.dist.cph[,2]), f = 0)
+#     
+#     coef.cph <- coef(cph)
+#     names(coef.cph) <- NULL
+#     
+#     ## return function to compute estimated not-censoring
+#     ## probability conditional on x (covariates)
+#     tmpFunc <- function(t, x)
+#     {
+#       if (is.matrix(x))
+#       {
+#         return( tmpFunc.cph(t) ^ exp(drop(x %*% coef.cph)) )
+#       } else 
+#       {
+#         return( tmpFunc.cph(t) ^ exp(   sum(x * coef.cph)) )
+#       }
+#     }
+#     attr(tmpFunc, "cox") <- TRUE
+#   }
+# 
+#   tmpFunc
+# }
 
 
 AFTivIPCWScore <- function(beta, data.simu)

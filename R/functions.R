@@ -240,14 +240,16 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
                               lambda, beta0, beta1, verbose = F, norta = F,
                               survival.distribution = c("exponential", "normal"),
                               confounding.function = c("linear", "inverted", "exponential", "square"),
+                              dependent.censoring = FALSE,
                               break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"),
-                              error.amount = 0.01) {
+                              error.amount = 0.01, cens.distribution = c("exp", "lognormal", "weibull")) {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
   
   surv.dist <- match.arg(survival.distribution)
   confounding.function <- match.arg(confounding.function)
   break.method <- match.arg(break.method)
+  cens.distribution <- match.arg(cens.distribution)
   
   if (norta){
     #correlation matrix for U, Y
@@ -263,14 +265,74 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
   }
   
   #if specified, print sample correlation between Z, X, U, and Y
-  if (verbose == T) {print (cor(vars))}
+  if (verbose) {print (cor(vars))}
   
   X <- vars$X #covariate
   Z <- vars$Z #instrument
   #failure variable
   Fail.time <- vars$Y
-  #generate independent censoring data
-  Cen.time <- rexp(sample.size, rate = lambda)
+  
+  
+  lim.time <- quantile(vars$Y, prob = c(0.99))
+  #Fail.time <- pmin(vars$Y, lim.time)
+  if (dependent.censoring)
+  {
+    beta.x <- runif(NCOL(X), min = -0.5, max = 0.5)
+    beta.z <- runif(1, min = -0.5, max = 0.5)
+    
+    beta.z <- 0.5
+    beta.x <- 0.5
+    
+    if (cens.distribution == "exp")
+    {
+      cens.effect <- exp(drop(X * beta.x + beta.z * Z))
+      Cen.time <- rexp(sample.size, rate = 1/cens.effect)
+    } else if (cens.distribution == "weibull")
+    {
+      shape <- 0.5
+      
+      xbeta <- drop(X * beta.x + beta.z * Z)
+      nu <- runif(sample.size)
+      
+      # S(t|x) = exp(-H_0(t)exp(x'beta))
+      # T = S^{-1}(V|x) = H_0^{-1}(-log(V) / exp(x'beta))
+      # V ~ unif(0,1)
+      # Weibull: H_0(t) = lambda * t ^ rho => H_0^{-1}(t) = (t/lambda)^(1/rho)
+      Cen.time <- (-log(nu) / (lambda * exp(xbeta))) ^ (1 / shape)
+    } else if (cens.distribution == "lognormal")
+    {
+      xbeta <- drop(X * beta.x + beta.z * Z)
+      
+      Cen.time <- exp(rnorm(sample.size, mean = xbeta, sd = 1))
+      
+    }
+  } else 
+  {
+    if (cens.distribution == "exp")
+    {
+      # generate independent censoring data
+      Cen.time <- rexp(sample.size, rate = lambda)
+    } else if (cens.distribution == "weibull")
+    {
+      shape <- 0.5
+      nu <- runif(sample.size)
+      
+      # S(t|x) = exp(-H_0(t)exp(x'beta))
+      # T = S^{-1}(V|x) = H_0^{-1}(-log(V) / exp(x'beta))
+      # V ~ unif(0,1)
+      # Weibull: H_0(t) = lambda * t ^ rho => H_0^{-1}(t) = (t/lambda)^(1/rho)
+      Cen.time <- (-log(nu) / (lambda * 1)) ^ (1 / shape)
+      
+    } else if (cens.distribution == "lognormal")
+    {
+      Cen.time <- exp(rnorm(sample.size))
+    }
+  }
+  
+  #Cen.time <- pmin(Cen.time, quantile(Cen.time, prob = 0.99))
+  
+  
+  
   #failure indicator
   delta <- 1 * (Cen.time >= Fail.time)
   # you can also use X<- pmin(Fail.time, Cen.time)
@@ -304,12 +366,12 @@ simIVMultivarSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.
   X <- vars$X #covariate
   Z <- vars$Z #instrument
   # failure variable
-  lim.time <- quantile(Fail.time, prob = c(0.98))
+  lim.time <- quantile(vars$Y, prob = c(0.975))
   Fail.time <- pmin(vars$Y, lim.time)
   if (dependent.censoring)
   {
-    beta.x <- runif(NCOL(X), min = -1, max = 1)
-    beta.z <- runif(1, min = -1, max = 1)
+    beta.x <- runif(NCOL(X), min = -0.5, max = 0.5)
+    beta.z <- runif(1, min = -0.5, max = 0.5)
     
     if (cens.distribution == "exp")
     {
@@ -387,7 +449,9 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                        bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                                        survival.distribution = c("exponential", "normal"), 
                                        confounding.function, break2sls = FALSE,
-                                       break.method = c("collider", "error", "error.u", "z.on.y"), error.amount = 0.01){
+                                       break.method = c("collider", "error", "error.u", "z.on.y"), error.amount = 0.01,
+                                       dependent.censoring = FALSE, cens.distribution = c("exp", "lognormal", "weibull"))
+{
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
   # proposed by Professor Yu. It stores the results in vectors and returns a list containing these vectors.
@@ -419,11 +483,12 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
       #####  GENERATE DATA  #########
       Data.simu <- simIVSurvivalData(sample.size, conf.corr.X = conf.corr.X, conf.corr.Y = conf.corr.Y, 
                                      instrument.strength = instrument.strength, lambda = lambda, 
-                                     beta0 = beta0, beta1=beta1, norta = F,
+                                     beta0 = beta0, beta1=beta1, norta = FALSE,
                                      survival.distribution = survival.distribution, 
                                      confounding.function = confounding.function,
+                                     dependent.censoring = dependent.censoring,
                                      break2sls = break2sls, break.method = break.method,
-                                     error.amount = error.amount)
+                                     error.amount = error.amount, cens.distribution = cens.distribution)
 
       beta.tmp <- array(0, dim = length(type))
       coverage.tmp <- array(NA, dim = length(type))
@@ -439,7 +504,18 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
         }
         if (type[e] == "AFT-IPCW") {
           #generate function G_c() for ICPW
-          GC.list <- genKMCensoringFuncVar(Data.simu)
+          if (dependent.censoring)
+          {
+            GC.list <- list(genKMCensoringFunc(Data.simu, cox = TRUE, 
+                                          X = cbind(Data.simu$X, Data.simu$Z)),
+                                          #X = Data.simu$X),
+                            
+                            "nothing", "nothing")
+          } else
+          {
+            GC.list <- genKMCensoringFuncVar(Data.simu)
+            attr(GC.list[[1]], "cox") <- FALSE
+          }
           GC <- GC.list[[1]]
           #GC <- function(x) 1 - pexp(x,1)
           VarFunc <- GC.list[[2]]
@@ -454,7 +530,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
           beta.tmp[e] <- uniroot(est.eqn, interval = c(beta1 - 2, beta1 + 2), tol = 0.001, "data.simu" = Data.simu)$root
         }
 
-        cat("sim ", l, "\n")
+        cat("sim ", l, ", beta = ", beta.tmp[e], "\n")
         
         
         if (bootstrap) {
@@ -666,9 +742,12 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                          B = 200L, conf.level = 0.95,
                          bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
+                         dependent.censoring = FALSE,
                          confounding.function = c("linear", "inverted", "exponential", "square"),
                          break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"),
-                         error.amount = 0.01, use.uniroot = TRUE) {
+                         error.amount = 0.01, use.uniroot = TRUE, 
+                         cens.distribution = c("exp", "lognormal", "weibull")) 
+{
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
   results <- array(0, dim = c(length(est.eqns), nrow(grid), (ncol(grid) + 13)))
@@ -690,8 +769,10 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                                         B = B, conf.level = conf.level,
                                         bootstrap = bootstrap, boot.method = boot.method,
                                         survival.distribution = survival.distribution, 
+                                        dependent.censoring = dependent.censoring,
                                         confounding.function = confounding.function, break2sls = break2sls,
-                                        break.method = break.method, error.amount = error.amount)
+                                        break.method = break.method, error.amount = error.amount,
+                                        cens.distribution = cens.distribution)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res
     }
@@ -731,7 +812,8 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
 
 fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names, 
                    init.par = NULL, init.method = c("lm", "bisection"),
-                   fit.method = c("dfsane", "multiStart", "nleqslv", "sane"), ...) {
+                   fit.method = c("dfsane", "multiStart", "nleqslv", "sane"), 
+                   dependent.censoring = FALSE, ...) {
   
   require(BB); require(nleqslv)
   fit.method <- match.arg(fit.method)
@@ -802,12 +884,19 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
     #from CRAN package 'BB'
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, X = as.matrix(cbind(data$X, data$Z)))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
       df <- BBsolve(par = init.par, fn = est.eqn, ...,
                     survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), 
+                    Z = data$Z, 
                     GC = GC, conf.x.loc = conf.x.loc)
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), 
-                      ZXmat = as.matrix(ZXmat), GC = GC, conf.x.loc = conf.x.loc)
+                      ZXmat = as.matrix(ZXmat), Z = data$Z, GC = GC, conf.x.loc = conf.x.loc)
     } else {
       df <- BBsolve(par = init.par, fn = est.eqn, ...,
                     survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat))
@@ -858,9 +947,15 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
     p0 <- rbind(p0, init.par)
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, X = as.matrix(cbind(data$X, data$Z)))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
       df <- multiStart(par = p0, fn = est.eqn, ..., action = "solve",
-                       survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), GC = GC)
+                       survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), Z = as.matrix(data$Z), GC = GC)
       fval <- est.eqn(beta = df$par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat), GC = GC)
     } else {
       df <- multiStart(par = p0, fn = est.eqn, ..., action = "solve",
@@ -893,6 +988,7 @@ fitAFT <- function(data, est.eqn = NULL, instrument.names, confounded.x.names,
 
 repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NULL, instrument.names, confounded.x.names,
                       init.par = NULL, init.method = c("lm", "bisection"), final.fit = TRUE,
+                      dependent.censoring = FALSE,
                       fit.method = c("dfsane", "multiStart", "nleqslv", "sane"), ...) {
   # repeatedly calls fitAFT until convergence. decreasing noise 
   # is added to coefficients at each call to encourage solution
@@ -906,6 +1002,7 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
     est <- fitAFT(data = data, est.eqn = est.eqn, 
                   instrument.names = instrument.names, 
                   confounded.x.names = confounded.x.names, 
+                  dependent.censoring = dependent.censoring,
                   fit.method = fit.method, init.par = init.par, ...)
     ssf <- est$sum.sq.fval
     sd <- 5e-6 * min(sqrt(best.ssf), 5e2)
@@ -924,6 +1021,7 @@ repFitAFT <- function(tol = 5, maxit = 25, data, est.eqn = NULL, est.eqn.sm = NU
                        confounded.x.names = confounded.x.names, 
                        fit.method = "nleqslv", init.par = init.par, 
                        global = "dbldog", method = "Broyden", 
+                       dependent.censoring = dependent.censoring,
                        control = list(ftol=1e-3, btol=1e-4, trace=1))
   }
   best.est$est.eqn <- est.eqn
