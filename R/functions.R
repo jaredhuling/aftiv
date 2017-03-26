@@ -246,7 +246,7 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
                               confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                               dependent.censoring = FALSE,
                               break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"),
-                              error.amount = 0.01, cens.distribution = c("exp", "lognormal", "weibull")) {
+                              error.amount = 0.01, cens.distribution = c("exp", "lognormal", "weibull", "unif")) {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
   
@@ -306,7 +306,8 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
       # V ~ unif(0,1)
       # Weibull: H_0(t) = lambda * t ^ rho => H_0^{-1}(t) = (t/lambda)^(1/rho)
       Cen.time <- (-log(nu) / (lambda * exp(xbeta))) ^ (1 / shape)
-    } else if (cens.distribution == "lognormal")
+    } else if (cens.distribution == "lognormal" || 
+               cens.distribution == "unif") ## can't have unif when C depends on covariates
     {
       xbeta <- drop(X * beta.x + beta.z * Z)
       
@@ -333,6 +334,10 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
     } else if (cens.distribution == "lognormal")
     {
       Cen.time <- exp(rnorm(sample.size))
+    } else if (cens.distribution == "unif")
+    {
+      Cen.time <- exp(runif(sample.size, min = min(min(log(Fail.time))),
+                                     max = 1 * quantile(log(vars$Y), prob = c(0.98))))
     }
   }
   
@@ -458,7 +463,7 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
                                        survival.distribution = c("exponential", "normal"), 
                                        confounding.function, break2sls = FALSE,
                                        break.method = c("collider", "error", "error.u", "z.on.y"), error.amount = 0.01,
-                                       dependent.censoring = FALSE, cens.distribution = c("exp", "lognormal", "weibull"))
+                                       dependent.censoring = FALSE, cens.distribution = c("exp", "lognormal", "weibull", "unif"))
 {
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
@@ -565,9 +570,11 @@ SimIVDataCompareEstimators <- function(type, n.sims, sample.size, conf.corr.X = 
       #store results on successful attempt
       beta.store[l, ] <- beta.tmp
       coverage.store[l, ] <- coverage.tmp
+      print(colMeans(beta.store[1:l,,drop=FALSE], na.rm=TRUE))
       print(colMeans(coverage.store, na.rm=TRUE))
       setTxtProgressBar(pb, l)
       pct.censored[l] <- mean(1 - Data.simu$delta)
+      cat("\n Pct censored:", mean(1 - Data.simu$delta), "\n")
       #add correlation matrix so we can take mean
       tot.cors <- tot.cors + attr(Data.simu, "cor")
     }
@@ -757,7 +764,7 @@ simulateGrid <- function(est.eqns, grid, beta, seed = NULL,
                          error.amount = 0.01, use.uniroot = TRUE, 
                          betax.cens,
                          betaz.cens,
-                         cens.distribution = c("exp", "lognormal", "weibull")) 
+                         cens.distribution = c("exp", "lognormal", "weibull", "unif")) 
 {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
