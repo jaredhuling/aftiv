@@ -110,10 +110,10 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   } else {
     X <- switch(confounding.function,
                 linear = Z2XCoef * Z + (U2XCoef * U) + rnorm(N, sd = 1),
-                inverted = Z2XCoef / Z + (U2XCoef * U) + rnorm(N, sd = 1),
+                inverted = Z2XCoef * Z / (1 + abs(Z)) + (U2XCoef * U) + rnorm(N, sd = 1),
                 exponential = Z2XCoef * exp(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
                 sine = Z2XCoef * (Z + sin(Z * pi)) + (U2XCoef * U) + rnorm(N, sd = 1),
-                square = Z2XCoef * (Z^2) + (U2XCoef * U) + rnorm(N, sd = 1))
+                square = Z2XCoef * (Z - 1 * Z^2) + (U2XCoef * U) + rnorm(N, sd = 1))
     #X <- X/sd(X)
   }
   #X <- X / sd(X)
@@ -197,13 +197,13 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
     if (confounding.function == "linear") {
       X <- Z2XCoef * Z.append + U2XCoef * U.append + rand.mat
     } else if (confounding.function == "inverted") {
-      X <- Z2XCoef / Z.append + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef * Z.append / (1 + abs(Z.append)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "exponential") {
       X <- Z2XCoef * exp(Z.append) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "sin") {
       X <- Z2XCoef * (Z.append + sin(Z.append * pi)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "square") {
-      X <- Z2XCoef * (Z.append^2) + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef * (Z.append - 1 * Z.append^2) + (U2XCoef * U.append) + rand.mat
     } else {
       X <- Z2XCoef * Z.append + U2XCoef * U.append + rand.mat
     }
@@ -281,7 +281,7 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
   
   
   lim.time <- quantile(vars$Y, prob = c(0.99))
-  #Fail.time <- pmin(vars$Y, lim.time)
+  Fail.time <- pmin(vars$Y, lim.time)
   if (dependent.censoring)
   {
     beta.x <- runif(NCOL(X), min = -0.5, max = 0.5)
@@ -296,7 +296,7 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
       Cen.time <- rexp(sample.size, rate = 1/cens.effect)
     } else if (cens.distribution == "weibull")
     {
-      shape <- 0.5
+      shape <- 0.25
       
       xbeta <- drop(X * beta.x + beta.z * Z)
       nu <- runif(sample.size)
@@ -305,7 +305,8 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
       # T = S^{-1}(V|x) = H_0^{-1}(-log(V) / exp(x'beta))
       # V ~ unif(0,1)
       # Weibull: H_0(t) = lambda * t ^ rho => H_0^{-1}(t) = (t/lambda)^(1/rho)
-      Cen.time <- (-log(nu) / (lambda * exp(xbeta))) ^ (1 / shape)
+      #     Cen.time <- (-log(nu) / (lambda * exp(xbeta))) ^ (1 / shape)
+      Cen.time <- rweibull(sample.size, shape = shape, scale = exp(xbeta / gamma(1 + 1/shape)) )
     } else if (cens.distribution == "lognormal" || 
                cens.distribution == "unif") ## can't have unif when C depends on covariates
     {
@@ -322,25 +323,27 @@ simIVSurvivalData <- function(sample.size, conf.corr.X = 0.0, conf.corr.Y, instr
       Cen.time <- rexp(sample.size, rate = lambda)
     } else if (cens.distribution == "weibull")
     {
-      shape <- 0.5
+      shape <- 0.25
       nu <- runif(sample.size)
       
       # S(t|x) = exp(-H_0(t)exp(x'beta))
       # T = S^{-1}(V|x) = H_0^{-1}(-log(V) / exp(x'beta))
       # V ~ unif(0,1)
       # Weibull: H_0(t) = lambda * t ^ rho => H_0^{-1}(t) = (t/lambda)^(1/rho)
-      Cen.time <- (-log(nu) / (lambda * 1)) ^ (1 / shape)
-      
+      #   Cen.time <- (-log(nu) / (lambda * 1)) ^ (1 / shape)
+      Cen.time <- rweibull(sample.size, shape = shape, scale = lambda  )
     } else if (cens.distribution == "lognormal")
     {
-      Cen.time <- exp(rnorm(sample.size))
+      Cen.time <- exp(rnorm(sample.size, mean = mean(log(Fail.time))))
     } else if (cens.distribution == "unif")
     {
       Cen.time <- exp(runif(sample.size, min = min(min(log(Fail.time))),
                                      max = 1 * quantile(log(vars$Y), prob = c(0.98))))
     }
   }
-  
+  plot(density(Fail.time), ylim = c(0, 1) , xlim = c(0, quantile(vars$Y, prob = c(0.975))))
+  lines(density(Cen.time), col = "blue")
+  plot(density(Cen.time - Fail.time))
   #Cen.time <- pmin(Cen.time, quantile(Cen.time, prob = 0.99))
   
   
