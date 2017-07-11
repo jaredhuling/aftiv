@@ -6,9 +6,9 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC, multiplier.wts = NULL)
   
   #the score function for the AFT model with instrumental variables and Inverse Probability Censoring Weighting
   survival <- data.simu$survival
-  X <- data.simu$X
-  Z <- data.simu$Z
-  n <- nrow(X)
+  X        <- data.simu$X
+  Z        <- data.simu$Z
+  n        <- nrow(X)
   if (!is.null(multiplier.wts)) 
   {
     stopifnot(length(multiplier.wts) == n)
@@ -34,19 +34,19 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC, multiplier.wts = NULL)
   bX <- X %*% beta
   
   #store the T_i - bX_i term (error)
-  err = survival$t - bX
+  err <- survival$t - bX
   
   
   
   #sort according to error size ####observed failure time 
   #data.simu <- data.simu[order(data.simu$X),]  
   order.idx <- order(err)
-  survival <- survival[order.idx,]
-  tt <- tt[order.idx]
-  bX <- bX[order.idx]
-  err <- err[order.idx]
-  X <- as.matrix(X[order.idx,])
-  Z <- as.matrix(Z[order.idx,]) 
+  survival  <- survival[order.idx,]
+  tt        <- tt[order.idx]
+  bX        <- bX[order.idx]
+  err       <- err[order.idx]
+  X         <- as.matrix(X[order.idx,])
+  Z         <- as.matrix(Z[order.idx,]) 
   
   
   #create indicator to set to zero terms where GCT == 0 and 
