@@ -114,7 +114,7 @@ aftfit <- function(formula,
     BB.ns <- FALSE
   }
 
-  #solve each estimating equation for beta
+  # solve each estimating equation for beta
   for (e in 1:length(method))
   {
     # return correct estimating equation function
@@ -154,7 +154,7 @@ aftfit <- function(formula,
       cat("Fitting model", e, "\n")
     }
     
-    #solve for beta using deriv-free spectral method
+    # solve for beta using deriv-free spectral method
     est <- repFitAFT(tol                 = dfsane.tol, 
                      data                = surv.dat, 
                      est.eqn             = est.eqn, 
@@ -196,6 +196,359 @@ aftfit <- function(formula,
   class(ret) <- "aftfits"
   ret
 }
+
+
+repFitAFT <- function(tol                 = 5, 
+                      maxit               = 25, 
+                      data, 
+                      est.eqn             = NULL, 
+                      est.eqn.sm          = NULL, 
+                      instrument.names, 
+                      confounded.x.names,
+                      init.par            = NULL, 
+                      init.method         = c("lm", "bisection"), 
+                      final.fit           = TRUE,
+                      dependent.censoring = FALSE,
+                      fit.method          = c("dfsane", "multiStart", "nleqslv", "sane"), 
+                      ...) 
+{
+  # repeatedly calls fitAFT until convergence. decreasing noise 
+  # is added to coefficients at each call to encourage solution
+  ct  <- 0
+  ssf <- best.ssf <- 1e10
+  while (ssf > tol & ct <= maxit) 
+  {
+    ct <- ct + 1
+    old.ssf <- ssf
+    
+    #solve for beta using deriv-free spectral method
+    est <- fitAFT(data                = data, 
+                  est.eqn             = est.eqn, 
+                  instrument.names    = instrument.names, 
+                  confounded.x.names  = confounded.x.names, 
+                  dependent.censoring = dependent.censoring,
+                  fit.method          = fit.method, 
+                  init.par            = init.par, 
+                  ...)
+    ssf <- est$sum.sq.fval
+    sd  <- 5e-6 * min(sqrt(best.ssf), 5e2)
+    if (ssf < best.ssf) 
+    {
+      best.est <- est
+      best.ssf <- ssf
+      init.par <- best.est$par + rnorm(length(est$par), sd = sd)
+    } else 
+    {
+      init.par <- best.est$par + rnorm(length(est$par), sd = sd)
+    }
+    print (sprintf("Current ssf: %g   Best ssf: %g, sd: %g", ssf, best.ssf, sd))
+  }
+  if (final.fit) 
+  {
+    best.est <- fitAFT(data                = data,
+                       est.eqn             = est.eqn.sm, 
+                       instrument.names    = instrument.names, 
+                       confounded.x.names  = confounded.x.names, 
+                       fit.method          = "nleqslv", 
+                       init.par            = init.par, 
+                       global              = "dbldog", 
+                       method              = "Broyden", 
+                       dependent.censoring = dependent.censoring,
+                       control             = list(ftol  = 1e-3, 
+                                                  btol  = 1e-4, 
+                                                  trace = 1))
+  }
+  best.est$est.eqn        <- est.eqn
+  best.est$est.eqn.smooth <- est.eqn.sm
+  best.est$final.fit      <- final.fit
+  best.est$call           <- match.call()
+  best.est
+}
+
+
+
+fitAFT <- function(data, 
+                   est.eqn             = NULL, 
+                   instrument.names, 
+                   confounded.x.names, 
+                   init.par            = NULL, 
+                   init.method         = c("lm", "bisection"),
+                   fit.method          = c("dfsane", "multiStart", "nleqslv", "sane"), 
+                   dependent.censoring = FALSE, 
+                   ...) 
+{
+  fit.method <- match.arg(fit.method)
+  if (fit.method == "dfsane" & is.null(est.eqn)) 
+  {
+    stop("Please supply est.eqn if using fit.method: df.sane")
+  }
+  GC          <- NULL
+  init.method <- match.arg(init.method)
+  #instr.loc  <- match(instrument.names, colnames(data$X))
+  conf.x.loc  <- match(confounded.x.names, colnames(data$X))
+  ZXmat       <- data$X
+  
+  if (attr(est.eqn, "name") == "AFT2SLSScorePre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre"
+      | attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") 
+  {
+    #if 2SLS is used, replace Z with Xhat 
+    Z <- as.matrix(data$Z)
+    if (attr(est.eqn, "name") == "AFT2SLSScoreAllPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") 
+    {
+      for (v in 1:ncol(data$X)) 
+      {
+        data$X[,v] <- lm(data$X[,v] ~ Z)$fitted.values
+      }
+    } else 
+    {
+      for (v in 1:length(conf.x.loc)) 
+      {
+        dat.lm <- data.frame(response = data$X[,conf.x.loc[v]], predictor = Z)
+        Xhat   <- lm(response ~ predictor, data = dat.lm)$fitted.values
+        data$X[,conf.x.loc[v]] <- Xhat
+      }
+    }
+    if (attr(est.eqn, "name") == "AFT2SLSScoreSmoothPre" | attr(est.eqn, "name") == "AFT2SLSScoreSmoothAllPre") 
+    {
+      est.eqn               <- AFTScoreSmoothPre
+      attr(est.eqn, "name") <- "AFTScoreSmoothPre"
+    } else 
+    {
+      est.eqn               <- AFTScorePre
+      attr(est.eqn, "name") <- "AFTScorePre"
+    }
+    
+  } else 
+  {
+    ZXmat[,conf.x.loc] <- data$Z
+  }
+  
+  
+  if (is.null(init.par)) 
+  {
+    #Xhat <- lm(data$X[,conf.x.loc] ~ data$Z)$fitted.values
+    XXhat <- as.matrix(data$X)
+    #XXhat[,conf.x.loc] <- Xhat
+    init.par <- lm(data$survival$log.t ~ XXhat-1)$coefficients
+    init.par[which(is.na(init.par))] <- 0
+    names(init.par) <- colnames(data$X)
+    #num.vars <- length(init.par)
+    #names(init.par)[conf.x.loc] <- instrument.names
+    if (init.method == "bisection") 
+    {
+      interval <- list()
+      for (i in 1:num.vars) 
+      {
+        interval[[i]] <- c(init.par[i] - 1, init.par[i] + 1)
+      }
+      init.par <- coordinateBisection(est.eqn, 
+                                      interval = interval, 
+                                      num.vars = num.vars, 
+                                      max.iter = 500, 
+                                      bisection.tol = 0.25,
+                                      survival = data$survival, 
+                                      X = as.matrix(data$X), 
+                                      ZXmat = as.matrix(ZXmat))
+      print (init.par)
+      print (sum(est.eqn(init.par, survival=data$survival, X = as.matrix(data$X), ZXmat = as.matrix(ZXmat)) ^ 2))
+    }
+    names(init.par) <- colnames(data$X)
+  }
+  
+  
+  
+  if (fit.method == "dfsane") 
+  {
+    #Derivative-Free Spectral Approach for solving nonlinear systems of equations
+    #from CRAN package 'BB'
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
+    {
+      #generate function G_c() for ICPW 
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, X = as.matrix(cbind(data$X, data$Z)))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
+      df   <- BBsolve(par        = init.par, 
+                      fn         = est.eqn, 
+                      ...,
+                      survival   = data$survival, 
+                      X          = as.matrix(data$X), 
+                      ZXmat      = as.matrix(ZXmat), 
+                      Z          = data$Z, 
+                      GC         = GC, 
+                      conf.x.loc = conf.x.loc)
+      
+      fval <- est.eqn(beta       = df$par, 
+                      survival   = data$survival, 
+                      X          = as.matrix(data$X), 
+                      ZXmat      = as.matrix(ZXmat), 
+                      Z          = data$Z, 
+                      GC         = GC,
+                      conf.x.loc = conf.x.loc)
+    } else 
+    {
+      df   <- BBsolve(par      = init.par, 
+                      fn       = est.eqn, 
+                      ...,
+                      survival = data$survival, 
+                      X        = as.matrix(data$X), 
+                      ZXmat    = as.matrix(ZXmat))
+      
+      fval <- est.eqn(beta     = df$par, 
+                      survival = data$survival, 
+                      X        = as.matrix(data$X), 
+                      ZXmat    = as.matrix(ZXmat))
+    }
+    ret <- list(par                = df$par, 
+                fval               = fval, 
+                iter               = df$iter,
+                nobs               = nrow(data$X), 
+                nvars              = length(df$par),
+                GC                 = GC, 
+                instrument.names   = instrument.names, 
+                confounded.x.names = confounded.x.names)
+  } else if (fit.method == "nleqslv" | fit.method == "sane") 
+  {
+    if (!is.null(est.eqn)) 
+    {
+      if (attr(est.eqn, "name") != "AFTScoreSmoothPre" & attr(est.eqn, "name") != "AFTivScoreSmoothPre") 
+      {
+        
+        warning(paste(paste("Arg: est.eqn =", attr(est.eqn, "name")), 
+                      "not be used. Used AFTivScoreSmoothPre instead"))
+        est.eqn <- AFTivScoreSmoothPre
+      }
+    } else 
+    {
+      warning("est.eqn not supplied. Used AFTivScoreSmoothPre")
+      est.eqn <- AFTivScoreSmoothPre
+    }
+    if (fit.method == "nleqslv") 
+    {
+      df  <- nleqslv(x        = init.par, 
+                     fn       = est.eqn, 
+                     ..., 
+                     survival = data$survival, 
+                     X        = as.matrix(data$X), 
+                     ZXmat    = as.matrix(ZXmat), 
+                     tau      = 0.01)
+      
+      ret <- list(par                = df$x, 
+                  fval               = df$fvec, 
+                  iter               = df$iter,
+                  nobs               = nrow(data$X), 
+                  nvars              = length(df$par),
+                  GC                 = GC, 
+                  instrument.names   = instrument.names, 
+                  confounded.x.names = confounded.x.names)
+      #print(df)
+    } else if (fit.method == "sane") 
+    {
+      df   <- sane(par      = init.par, 
+                   fn       = est.eqn, 
+                   ...,
+                   survival = data$survival, 
+                   X        = as.matrix(data$X), 
+                   ZXmat    = as.matrix(ZXmat), 
+                   tau      = 0.01)
+      
+      fval <- est.eqn(beta     = df$par, 
+                      survival = data$survival, 
+                      X        = as.matrix(data$X), 
+                      ZXmat    = as.matrix(ZXmat),
+                      tau      = 0.01)
+      
+      ret  <- list(par                = df$par, 
+                   fval               = fval, 
+                   iter               = df$iter,
+                   nobs               = nrow(data$X), 
+                   nvars              = length(df$par),
+                   GC                 = GC, 
+                   instrument.names   = instrument.names, 
+                   confounded.x.names = confounded.x.names)
+    }
+  } else if (fit.method == "multiStart") 
+  {
+    #Derivative-Free Spectral Approach for solving nonlinear systems of equations
+    #from CRAN package 'BB'
+    n.starts <- 10
+    p        <- length(init.par)
+    p0       <- matrix(rnorm(n.starts * p), n.starts, p) 
+    p0       <- rbind(p0, init.par)
+    if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
+    {
+      #generate function G_c() for ICPW 
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, X = as.matrix(cbind(data$X, data$Z)))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
+      df   <- multiStart(par      = p0, 
+                         fn       = est.eqn, 
+                         ..., 
+                         action   = "solve",
+                         survival = data$survival, 
+                         X        = as.matrix(data$X), 
+                         ZXmat    = as.matrix(ZXmat), 
+                         Z        = as.matrix(data$Z), 
+                         GC       = GC)
+      
+      fval <- est.eqn(beta     = df$par, 
+                      survival = data$survival, 
+                      X        = as.matrix(data$X), 
+                      ZXmat    = as.matrix(ZXmat), 
+                      GC       = GC)
+    } else 
+    {
+      df <- multiStart(par      = p0,  
+                       fn       = est.eqn, 
+                       ..., 
+                       action   = "solve",
+                       survival = data$survival, 
+                       X        = as.matrix(data$X), 
+                       ZXmat    = as.matrix(ZXmat))
+      #take only the best ones and fit again
+      good.init.idx <- which(df$fvalue < 500)
+      p0 <- df$par[good.init.idx,] + matrix(rnorm(length(good.init.idx) * p, sd = 5e-6), length(good.init.idx), p) 
+      
+      df <- multiStart(par      = p0, 
+                       fn       = est.eqn, 
+                       ..., 
+                       action   = "solve",
+                       survival = data$survival, 
+                       X        = as.matrix(data$X), 
+                       ZXmat    = as.matrix(ZXmat))
+      
+      good.init.idx <- which(df$fvalue < 100)
+      df$par        <- df$par[good.init.idx,]
+      df$fvalue     <- df$fvalue[good.init.idx]
+      colnames(p0)  <- colnames(data$X)
+      fval <- est.eqn(beta     = df$par, 
+                      survival = data$survival, 
+                      X        = as.matrix(data$X), 
+                      ZXmat    = as.matrix(ZXmat))
+    }
+    ret <- list(par = df$par, fval = fval, iter = df$iter, 
+                nobs = nrow(data$X), nvars = length(df$par),
+                GC = GC, 
+                instrument.names = instrument.names, 
+                confounded.x.names = confounded.x.names)
+  }
+  ret$sum.sq.fval <- sum(ret$fval^2)
+  if (init.method == "multiStart") 
+  {
+    ret <- df
+  }
+  ret$call   <- match.call()
+  class(ret) <- "aft.fit"
+  ret
+}
+
 
 
 
