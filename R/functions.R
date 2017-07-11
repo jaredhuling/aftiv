@@ -15,11 +15,14 @@ setwd2sim <- function() {
   wd <- getwd();if (substr(wd, nchar(wd) - 5,nchar(wd)) == "ivsurv"){setwd(paste(getwd(), "/simulations", sep = ""))};getwd()
 }
 
-loadPackages <- function() {
+loadPackages <- function(load = TRUE) {
   packages <- c("survival", "ggplot2", "reshape2", "foreach", 
                 "Matrix", "SimCorMultRes", "grid", "BB")
-  print("Loading...")
-  for (i in packages) {library(i, character.only=T); print(i)}
+  if (load)
+  {
+    print("Loading...")
+    for (i in packages) {library(i, character.only = TRUE); print(i)}
+  }
   packages
 }
 
