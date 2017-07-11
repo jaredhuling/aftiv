@@ -1,5 +1,3 @@
-library(compiler)
-enableJIT(3)
 
 
 stableNewtonRaphson <- function(f.sm, f.ind = NULL, grad.func = NULL, num.vars, 
