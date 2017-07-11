@@ -299,7 +299,7 @@ bootstrap.model <- function(model,
   surv.dat[[3]]           <- instrument
   attr(surv.dat, "class") <- "survival.data"
   
-  beta <- se.hat     <- array(0, dim = c(length(method), nvars))
+  beta               <- se.hat                   <- array(0, dim = c(length(method), nvars))
   rownames(beta)     <- rownames(se.hat)         <- method
   colnames(beta)     <- colnames(se.hat)         <- colnames(X)
   fit.objects        <- bootstrap.objects        <- vector(length = length(method), mode = "list")
