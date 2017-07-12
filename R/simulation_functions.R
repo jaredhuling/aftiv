@@ -6,20 +6,22 @@
 
 
 
-norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.strength = 0.8, beta0 = 0, beta1 = 1) {
+norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.strength = 0.8, beta0 = 0, beta1 = 1) 
+{
   # generate correlated random variables with the IV assumptions using the NORTA method
-  require(Matrix)
-  require(SimCorMultRes)
+  
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
-  N <- as.integer(N)
-  ans <- rsmvnorm(R = N, cor.matrix = cor.matrix)
+  
+  N     <- as.integer(N)
+  ans   <- rsmvnorm(R = N, cor.matrix = cor.matrix)
   probs <- pnorm(ans)
-  U <- ans[,1] #confounder
-  Z <- rnorm(N)
-  X1 <- instrument.strength * Z + sqrt(1 - instrument.strength^2) * rnorm(N)
-  X <- conf.corr.X * U + sqrt(1 - conf.corr.X^2) * X1
-  ans <- cbind(Z, X, qexp(probs[,2], rate = exp(1 * (beta0 + beta1 * X))), U)
+  U     <- ans[,1] #confounder
+  Z     <- rnorm(N)
+  X1    <- instrument.strength * Z + sqrt(1 - instrument.strength^2) * rnorm(N)
+  X     <- conf.corr.X * U + sqrt(1 - conf.corr.X^2) * X1
+  ans   <- cbind(Z, X, qexp(probs[,2], rate = exp(1 * (beta0 + beta1 * X))), U)
+  
   colnames(ans) <- c("Z", "X", "Y", "U")
   data.frame(ans)
 }
