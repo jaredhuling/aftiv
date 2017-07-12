@@ -30,7 +30,8 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
                       confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                       break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"), 
-                      error.amount = 0.01) {
+                      error.amount = 0.01) 
+{
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
@@ -111,7 +112,8 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
 }
 
 genIVDataOld <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
-                      survival.distribution = c("exponential", "normal")) {
+                      survival.distribution = c("exponential", "normal")) 
+{
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
@@ -134,7 +136,8 @@ genIVDataOld <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
 
 genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confounded,
                               survival.distribution = c("exponential", "normal"),
-                              intercept = FALSE, break2sls = FALSE, confounding.function) {
+                              intercept = FALSE, break2sls = FALSE, confounding.function) 
+{
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
