@@ -166,7 +166,8 @@ RcppExport SEXP AFTScorePre(SEXP XX,        // design matrix
     //std::sort(index.begin(), index.end(), std::bind(compare,  _1, _2, err ));
     
     //std::iota(at_risk_terms.data() + nobs, at_risk_terms.data(), 1);
-    for (int i = nobs; i > 0; i--) {
+    for (int i = nobs; i > 0; i--) 
+    {
       at_risk_terms[nobs - i] = i;
     }
     at_risk_terms /= nobs;
@@ -176,7 +177,8 @@ RcppExport SEXP AFTScorePre(SEXP XX,        // design matrix
     //X = X(index,_ );
     //delta_vec = delta_vec[index];
     
-    for (int i = 0; i < nvars; i++) {
+    for (int i = 0; i < nvars; i++) 
+    {
       X_col = X.col(i);
       at_risk_X_terms = cumsum_rev(X_col) / nobs;
 
