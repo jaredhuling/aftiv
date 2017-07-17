@@ -629,55 +629,58 @@ bootstrapCI <- function(aft.fit, data, n.bootstraps = 999, percent, packages = N
   stopifnot(class(aft.fit) == "aft.fit")
   
   n.bootstraps <- as.integer(n.bootstraps)
-  call <- aft.fit$call
+  call         <- aft.fit$call
   #initialize with coefficient estimates from initial
   #fit to speed up fitting process
   
   newmaxit <- 32
   call[[match("maxit", names(call))]] <- as.name("newmaxit")
   coefficients <- aft.fit$par
-  if (!is.null(call[[match("init.par", names(call))]])) {
+  if (!is.null(call[[match("init.par", names(call))]])) 
+  {
     call[[match("init.par", names(call))]] <- as.name("coefficients")
-  } else {
+  } else 
+  {
     call$init.par <- as.name("coefficients")
   }
   boot.estimates <- foreach(i = 1:n.bootstraps, .packages = packages, .combine = cbind, 
                             .export = c(func.names, "newmaxit", "coefficients")) %dopar% {
                               print(sprintf("Bootstrap %g / %g", i, n.bootstraps))
-                              set.seed(i+123)
+                              set.seed(i + 123)
                               #resample data
-                              samp.idx <- sample(1:nrow(data$X), nrow(data$X), replace = T)
-                              data.samp <- data
-                              data.samp$X <- data.samp$X[samp.idx,]
-                              data.samp$Z <- data.samp$Z[samp.idx]
+                              samp.idx           <- sample(1:nrow(data$X), nrow(data$X), replace = T)
+                              data.samp          <- data
+                              data.samp$X        <- data.samp$X[samp.idx,]
+                              data.samp$Z        <- data.samp$Z[samp.idx]
                               data.samp$survival <- data.samp$survival[samp.idx,]
                               call[[match("data", names(call))]] <- as.name("data.samp")
                               #fit coefficients with resampled data
-                              gc()
-                              boot.par <- eval(call)$par
-                              boot.par
+                              eval(call)$par
                             }
   
-  ret.mat <- data.frame(array(0, dim = c(length(coefficients), 5)))
+  ret.mat        <- data.frame(array(0, dim = c(length(coefficients), 5)))
   names(ret.mat) <- c("Name", "Beta", "ci.lower", "ci.upper", "se")
   
-  for (i in 1:length(coefficients)) {
-    boot.est <- boot.estimates[i,]
-    alpha.o.2 <- (1 - percent) / 2
+  for (i in 1:length(coefficients)) 
+  {
+    boot.est     <- boot.estimates[i,]
+    alpha.o.2    <- (1 - percent) / 2
     basic.quants <- quantile(boot.est, probs = c(1 - alpha.o.2, alpha.o.2))
-    basic.CIs <- 2 * coefficients[i] - basic.quants
-    se.hat <- sd(boot.est)
+    basic.CIs    <- 2 * coefficients[i] - basic.quants
+    se.hat       <- sd(boot.est)
     ret.mat[i,2:ncol(ret.mat)] <- c(coefficients[i], basic.CIs, se.hat)
   }
   ret.mat$Name <- names(coefficients)
-  ret = list(results = ret.mat, boot.est = boot.estimates)
-  class(ret) <- "bootstrap.results"
+  ret          <- list(results = ret.mat, boot.est = boot.estimates)
+  class(ret)   <- "bootstrap.results"
   ret
 }
 
-print.bootstrap.results <- function(bsr, true.beta = NULL) {
+print.bootstrap.results <- function(bsr, true.beta = NULL) 
+{
   res <- bsr$results
-  if (!is.null(true.beta)) {
+  if (!is.null(true.beta)) 
+  {
     res$True.Beta <- true.beta
     res <- res[,c(1,ncol(res),2:(ncol(res) - 1))]
   }
