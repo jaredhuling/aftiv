@@ -11,6 +11,9 @@ AFTScorePre.cpp <- function(beta, survival, X, ZXmat)
     log.t <- survival$log.t
   }
   
+  stopifnot(length(beta) == NCOL(X))
+  stopifnot(NROW(X) == length(survival$delta))
+  
   err       <- log.t - X %*% beta
   order.idx <- order(err)
   X         <- as.matrix(X[order.idx,, drop = FALSE]) 
@@ -30,6 +33,10 @@ AFTivScorePre.cpp <- function(beta, survival, X, ZXmat)
   {
     log.t <- survival$log.t
   }
+  
+  stopifnot(length(beta) == NCOL(X))
+  stopifnot(NROW(X) == NROW(ZXmat))
+  stopifnot(NROW(X) == length(survival$delta))
   
   err       <- log.t - X %*% beta
   order.idx <- order(err)
