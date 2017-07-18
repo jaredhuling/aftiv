@@ -6,7 +6,8 @@ AFTScorePre.cpp <- function(beta, survival, X, ZXmat)
   if (is.null(survival$log.t)) 
   {
     log.t <- log(survival$t)
-  } else {
+  } else 
+  {
     log.t <- survival$log.t
   }
   
@@ -25,7 +26,8 @@ AFTivScorePre.cpp <- function(beta, survival, X, ZXmat)
   if (is.null(survival$log.t)) 
   {
     log.t <- log(survival$t)
-  } else {
+  } else 
+  {
     log.t <- survival$log.t
   }
   
