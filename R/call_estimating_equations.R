@@ -13,7 +13,7 @@ AFTScorePre.cpp <- function(beta, survival, X, ZXmat)
   
   err       <- log.t - X %*% beta
   order.idx <- order(err)
-  X         <- as.matrix(X[order.idx,]) 
+  X         <- as.matrix(X[order.idx,, drop = FALSE]) 
   delta     <- survival$delta
   delta     <- delta[order.idx]
   
@@ -33,7 +33,7 @@ AFTivScorePre.cpp <- function(beta, survival, X, ZXmat)
   
   err       <- log.t - X %*% beta
   order.idx <- order(err)
-  ZXmat     <- as.matrix(ZXmat[order.idx,]) 
+  ZXmat     <- as.matrix(ZXmat[order.idx,, drop = FALSE]) 
   delta     <- survival$delta
   delta     <- delta[order.idx]
   
