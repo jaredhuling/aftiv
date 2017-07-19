@@ -190,7 +190,8 @@ AFTivScorePre <- function(beta, survival, X, ZXmat, multiplier.wts = NULL)
       #return the score   
       ret.vec[i] <- sum(survival$delta * (at.risk.terms * ZXmat[,i] - at.risk.Z.terms)) / sqrt(n)
     }  
-  } else {
+  } else 
+  {
     for (i in 1:nvars) 
     {
       
@@ -240,11 +241,11 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
   
   #sort according to error size ####observed failure time 
   #data.simu <- data.simu[order(data.simu$X),]  
-  order.idx <- order(survival$err)
-  survival <- survival[order.idx,] 
-  X <- as.matrix(X[order.idx,])
+  order.idx    <- order(survival$err)
+  survival     <- survival[order.idx,] 
+  X            <- as.matrix(X[order.idx,])
   #Z <- as.matrix(Z[order.idx,])
-  ZXmat <- as.matrix(ZXmat[order.idx,])
+  ZXmat        <- as.matrix(ZXmat[order.idx,])
   
   #create indicator to set to zero terms where GCT == 0 and 
   #set to 1 so no dividing by zero occurs
