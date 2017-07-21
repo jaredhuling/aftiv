@@ -59,6 +59,7 @@ AFTivIPCWScorePre.cpp <- function(beta, survival, X, ZXmat, GC)
     log.t <- survival$log.t
   }
   
+  
   stopifnot(length(beta) == NCOL(X))
   stopifnot(NROW(X) == NROW(ZXmat))
   stopifnot(NROW(X) == length(survival$delta))

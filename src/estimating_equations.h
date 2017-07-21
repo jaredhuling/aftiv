@@ -14,6 +14,8 @@ using namespace Rcpp;
 
 RcppExport SEXP AFTScorePre(SEXP, SEXP);
 
+RcppExport SEXP AFTivIPCWScorePre(SEXP, SEXP, SEXP, SEXP, SEXP);
+
 //RcppExport SEXP cumsum_rev_cp(SEXP);
 
 //RcppExport SEXP step_func(SEXP, SEXP, SEXP);

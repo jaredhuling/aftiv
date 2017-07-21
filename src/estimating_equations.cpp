@@ -10,7 +10,8 @@ bool compare(int a, int b, double* data)
 }
 
 
-Eigen::VectorXd rcppRev(Eigen::VectorXd x) {
+Eigen::VectorXd rcppRev(Eigen::VectorXd x) 
+{
   using Eigen::Map;
   using Eigen::VectorXd;
   typedef Eigen::VectorXd   Vd;
@@ -21,7 +22,8 @@ Eigen::VectorXd rcppRev(Eigen::VectorXd x) {
   return revX;
 } 
 
-Eigen::VectorXd cumsum_rev(Eigen::VectorXd x){
+Eigen::VectorXd cumsum_rev(Eigen::VectorXd x)
+{
   using Eigen::VectorXd;
   typedef Eigen::VectorXd   Vd;
   Vd xx(x);
@@ -132,13 +134,14 @@ RcppExport SEXP cumsum_rev_cp(SEXP x) {
 
 // port function from R
 RcppExport SEXP AFTScorePre(SEXP XX,        // design matrix
-		       SEXP delta_vec) 
+		                        SEXP delta_vec) 
 {
   using namespace Rcpp;
   using namespace RcppEigen;
   using namespace std;
   
-  try {
+  try 
+  {
     using Eigen::Map;
     using Eigen::MatrixXd;
     using Eigen::VectorXd;
@@ -188,11 +191,95 @@ RcppExport SEXP AFTScorePre(SEXP XX,        // design matrix
     }
     
     return wrap(ret_vec);
-  } catch (std::exception &ex) {
+  } catch (std::exception &ex) 
+  {
     forward_exception_to_r(ex);
-  } catch (...) {
+  } catch (...) 
+  {
     ::Rf_error("C++ exception (unknown reason)");
   }
   return R_NilValue; //-Wall
   
 }
+
+/*
+RcppExport SEXP AFTivIPCWScorePre(SEXP XX,        // design matrix
+                                  SEXP delta_vec,
+                                  SEXP GCT_,
+                                  SEXP icpw_num_denom_,
+                                  SEXP conf_x_loc_) 
+{
+  using namespace Rcpp;
+  using namespace RcppEigen;
+  using namespace std;
+  
+  try 
+  {
+    using Eigen::Map;
+    using Eigen::MatrixXd;
+    using Eigen::VectorXd;
+    using Eigen::VectorXi;
+    using Eigen::Lower;
+    using Rcpp::NumericVector;
+    using Rcpp::IntegerVector;
+    typedef Eigen::Map<VectorXd> MapVecd;
+    typedef Eigen::Map<VectorXi> MapVeci;
+    
+    const Eigen::Map<MatrixXd> X(as<Map<MatrixXd> >(XX));
+    const MapVeci delta(as<MapVeci>(delta_vec));
+    const MapVecd GCT(as<MapVecd>(GCT_));
+    const MapVecd icpw_num_denom(as<MapVecd>(icpw_num_denom_));
+    const MapVeci conf_x_loc(as<MapVeci>(conf_x_loc_));
+    const int nobs(X.rows());
+    const int nvars(X.cols());
+    
+    //int index[nobs];
+    
+    //VectorXd err(VectorXd::Zero(nobs));
+    VectorXd at_risk_X_terms(VectorXd::Zero(nobs));
+    VectorXd at_risk_terms(VectorXd::Zero(nobs));
+    VectorXd X_col(VectorXd::Zero(nobs));
+    VectorXd to_sum(VectorXd::Zero(nobs));
+    VectorXd ret_vec(VectorXd::Zero(nvars));
+    
+    
+    
+    //err = log_t_vec - X * beta_vec;
+    
+    //std::iota(index.begin(), index.end(), 0); // fill index with {0,1,2,...} This only needs to happen once
+    //std::sort(index.begin(), index.end(), std::bind(compare,  _1, _2, err ));
+    
+    //std::iota(at_risk_terms.data() + nobs, at_risk_terms.data(), 1);
+    for (int i = nobs; i > 0; i--) 
+    {
+      at_risk_terms[nobs - i] = i;
+    }
+    at_risk_terms /= nobs;
+    
+    //err = err[index];
+    //log_t_vec = log_t_vec[index];
+    //X = X(index,_ );
+    //delta_vec = delta_vec[index];
+    
+    for (int i = 0; i < nvars; i++) 
+    {
+      X_col = X.col(i);
+      at_risk_X_terms = cumsum_rev(X_col) / nobs;
+      
+      to_sum = delta.array() * (at_risk_terms.array() * X_col.array() - at_risk_X_terms.array()) / sqrt(nobs);
+      
+      ret_vec[i] = to_sum.sum();
+    }
+    
+    return wrap(ret_vec);
+  } catch (std::exception &ex) 
+  {
+    forward_exception_to_r(ex);
+  } catch (...) 
+  {
+    ::Rf_error("C++ exception (unknown reason)");
+  }
+  return R_NilValue; //-Wall
+  
+}
+ */
