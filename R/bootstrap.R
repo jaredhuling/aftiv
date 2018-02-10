@@ -47,10 +47,11 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
     {
       data <- list(...)[["data.simu"]]
       
-      for (i in 1:B) {
+      for (i in 1:B) 
+      {
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
-        GC.boot <- genKMCensoringFunc(data[samp.idx,])
-        Un2[i,] <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
+        GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        Un2[i,]  <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
       }
     } else 
     {
