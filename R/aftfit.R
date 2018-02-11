@@ -1,5 +1,55 @@
 
-
+#' Instrumental variable estimation via semiparametric rank-based AFT models
+#'
+#' @description Fitting function for instrumental variable estimation under the semiparametric AFT model
+#' @param formula a formula object, with the response on the left of a tilde operator, and the covariates. 
+#' The response must be a survival object as returned by the \code{Surv()} function.
+#' @param data a \code{data.frame} which contains the variables named in the \code{formula}.
+#' @param instrument a vector of length equal to the number of rows in \code{data} containing the instrumental variable
+#' @param confounded.x.names name of the exposure variable (endogenous variable) of interest
+#' @param method one of:
+#'     \itemize{
+#'         \item{\code{"AFT-IPCW"}}{ The proposed IV method that uses inverse probability of censoring weighting }
+#'         \item{\code{"AFT"}} { Plain rank-based AFT method that does not account for unmeasured confounding}
+#'         \item{\code{"AFT-IV"}} { biased AFT method that acccounts for unmeasured confounding, but not the non-ignorable censoring }
+#'         \item{\code{"AFT-2SLS"}} { Two-stage AFT method which accounts for unmeasured confounding but requires correct specification 
+#'         of relationship between IV and exposure }
+#'     }
+#' @param bootstrap logical variable indicating whether or not to run bootstrap
+#' @param boot.method bootstrap method to use. \code{"ls"} uses the LS method of Zeng and Lin (2008), 
+#' \code{"sv"} uses the SV method of Zeng and Lin (2008). \code{"full.bootstrap"} uses a full boostrap where resampled estimating equations
+#' are solved for each iteration (this method is very slow!)
+#' @param B number of bootstrap iterations
+#' @param dependent.censoring for the \code{"AFT-IPCW"} method, should the censoring model allow for dependence on covariates? If \code{TRUE}
+#' a Cox model will be fit for the censoring distribution
+#' @param init vector equal to the length of the number of parameters in the model used to initialize estimation
+#' @param tol positive tolerance threshold. Smaller values indicate more precise solutions are required
+#' @param maxit maximum number of restarts for \code{BB} algorithm
+#' @param verbose should messages be printed? logical variable
+#' @param BB.control control list for \code{BBsolve()} function. See \code{\link[BB]{BBsolve}} for more information
+#' @param ... not used
+#' 
+#'
+#' @examples
+#' library(aftiv)
+#'
+#' set.seed(1)
+#' true.beta <- c(1,-0.5,-0.5,0.25,0,0,-0.75,0.75)
+#' dat <- simIVMultivarSurvivalData(500,1,1,-1,1,true.beta,num.confounded = 1,
+#'                                  confounding.function = "exp")
+#' 
+#' df <- data.frame(dat$survival[c("delta", "log.t")], dat$X)
+#' Z <- dat$Z
+#' 
+#' system.time(aftf <- aftfit(Surv(log.t, delta) ~ ., data = df, 
+#'                            instrument = Z, 
+#'                            confounded.x.names = "X1",
+#'                            method = c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW"), 
+#'                            boot.method = "ls", verbose = 1,
+#'                            B = 200L, smoothed = FALSE,
+#'                            bootstrap = TRUE))
+#' 
+#' summary(aftf)
 aftfit <- function(formula, 
                    data, 
                    instrument, 
