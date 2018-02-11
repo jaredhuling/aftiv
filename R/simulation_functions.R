@@ -136,11 +136,14 @@ genIVDataOld <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
 
 genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confounded,
                               survival.distribution = c("exponential", "normal"),
-                              intercept = FALSE, break2sls = FALSE, confounding.function) 
+                              intercept = FALSE, break2sls = FALSE, 
+                              confounding.function = c("exponential", "linear", "sine", "square", "inverted"),
+                              sd = 0.5) 
 {
   if (!is.numeric(N) | N < 1) 
     stop("'N' must be greater than or equal to one")
   surv.dist <- match.arg(survival.distribution)
+  confounding.function <- match.arg(confounding.function)
   num.vars <- length(beta)
   N <- as.integer(N)
   U <- matrix(rnorm(N * num.confounded), ncol = num.confounded)
@@ -168,7 +171,7 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
       X <- Z2XCoef * Z.append / (1 + abs(Z.append)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "exponential") {
       X <- Z2XCoef * exp(Z.append) + (U2XCoef * U.append) + rand.mat
-    } else if (confounding.function == "sin") {
+    } else if (confounding.function == "sine") {
       X <- Z2XCoef * (Z.append + sin(Z.append * pi)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "square") {
       X <- Z2XCoef * (Z.append - 1 * Z.append^2) + (U2XCoef * U.append) + rand.mat
@@ -183,7 +186,7 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
 
   Y <- switch(surv.dist,
               exponential = rexp(N, rate = exp(-(X %*% beta + rowSums(U)))),
-              normal = exp(X %*% beta + rowSums(U) + rnorm(N, sd = 0.2)))
+              normal = exp(X %*% beta + rowSums(U) + rnorm(N, sd = sd)))
   
   ret <- list(Z = Z, X = X, Y = Y, U = U)
   ret

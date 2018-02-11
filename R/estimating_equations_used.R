@@ -235,9 +235,10 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
   }
   
   #store the T_i - bX_i term (error)
-  survival$err <- survival$log.t - X %*% beta
+  xbeta <- X %*% beta
+  survival$err <- survival$log.t - xbeta
   
-  survival$bX  <- X %*% beta
+  survival$bX  <- xbeta
   
   #sort according to error size ####observed failure time 
   #data.simu <- data.simu[order(data.simu$X),]  
@@ -264,15 +265,8 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     for (i in 1:nvars) 
     {
       #return the score   
-      if (i %in%  conf.x.loc) 
-      {
-        ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)  # at.risk.mat[,1]
-      } else 
-      {
-        ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
-      }
+      ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
+                          (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
     }
   } else 
   {
@@ -285,15 +279,8 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     for (i in 1:nvars) 
     {
       #return the score   
-      if (i %in%  conf.x.loc) 
-      {
-        ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
-      } else 
-      {
-        ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                            (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
-      }
+      ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
+                          (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
     }
   }
   
@@ -431,10 +418,17 @@ genIPCWNumDenomMultivar <- function(dat, Zx, Z, X, GC.func, conf.x.loc)
     if (!ind.zero)
     {
       ret.vec[1] <- sum(1 / ipcw)
-      for (j in conf.x.loc) 
-      {
-        ret.vec[j+1] <- sum(Zx[i:nrd,j] / ipcw)
-      }
+      #ret.vec[j+1] <- sum(Zx[i:nrd,j] / ipcw)
+      
+      ret.vec <- c(sum(1 / ipcw), colSums(Zx[i:nrd,,drop = FALSE] / ipcw))
+      # for (j in 1:num.vars)
+      # {
+      #   ret.vec[j+1] <- sum(Zx[i:nrd,j] / ipcw)
+      # }
+      # for (j in conf.x.loc)
+      # {
+      #   ret.vec[j+1] <- sum(Zx[i:nrd,j] / ipcw)
+      # }
       return (ret.vec)
     } else 
     {
@@ -442,9 +436,9 @@ genIPCWNumDenomMultivar <- function(dat, Zx, Z, X, GC.func, conf.x.loc)
     }
   })
   ret.mat <- do.call(rbind, at.risk.list)
-  for (j in idx) 
+  for (j in idx)
   {
-    ret.mat[,j+1] <- cumsumRev(Zx[,j])
+  ret.mat[,j+1] <- cumsumRev(Zx[,j])
   }
   ret.mat
 }

@@ -231,7 +231,7 @@ repFitAFT <- function(tol                 = 5,
                   init.par            = init.par, 
                   ...)
     ssf <- est$sum.sq.fval
-    sd  <- 5e-6 * min(sqrt(best.ssf), 5e2)
+    sd  <- 5e-3 * min(sqrt(best.ssf), 50)
     if (ssf < best.ssf) 
     {
       best.est <- est
