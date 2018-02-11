@@ -8,6 +8,12 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
   is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
     attr(esteqn, "name") == "AFTivIPCWScorePre"
   
+  dependent.censoring <- FALSE
+  if (!is.null(GC))
+  {
+    dependent.censoring <- attr(GC, "cox")
+  }
+  
   Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
   if (is.ipcw) 
   {
@@ -50,7 +56,13 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
       for (i in 1:B) 
       {
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
-        GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        if (dependent.censoring)
+        {
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,], cox = TRUE, X = data[samp.idx,]$X)
+        } else
+        {
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        }
         Un2[i,]  <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
       }
     } else 
@@ -64,14 +76,21 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
       for (i in 1:B) 
       {
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
-        GC.boot  <- genKMCensoringFunc(survival[samp.idx,])
+        if (dependent.censoring)
+        {
+          GC.boot <- genKMCensoringFunc(survival[samp.idx,], cox = TRUE, 
+                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc]))[samp.idx,] )
+        } else 
+        {
+          GC.boot <- genKMCensoringFunc(survival[samp.idx,])
+        }
+        
         Un2[i,]  <- esteqn(beta       = beta, 
                            GC         = GC.boot, 
                            survival   = survival[samp.idx,],
                            X          = X[samp.idx,], 
                            ZXmat      = ZXmat[samp.idx,], 
-                           conf.x.loc = conf.x.loc,
-                           multiplier.wts = Mb[,i])
+                           conf.x.loc = conf.x.loc)
       }
     }
     
@@ -163,14 +182,15 @@ svBootstrap <- function(beta, esteqn, B, nobs,
   is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
     attr(esteqn, "name") == "AFTivIPCWScorePre"
   
+  
+  dependent.censoring <- FALSE
+  if (!is.null(GC))
+  {
+    dependent.censoring <- attr(GC, "cox")
+  }
+  
   if (is.ipcw) 
   {
-    #time.t <- list(...)[["data.simu"]]$t
-    #Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, GC = GC, ...) ))
-    
-    
-    #print("ipcw var1")
-    #print(var(t(Un1) ))
     
     Un1 <- array(NA, dim = c(B, p) )
     if (attr(esteqn, "name") == "evalAFTivIPCWScorePrec") 
@@ -180,7 +200,13 @@ svBootstrap <- function(beta, esteqn, B, nobs,
       for (i in 1:B) 
       {
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
-        GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        if (dependent.censoring)
+        {
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,], cox = TRUE, X = data[samp.idx,]$X)
+        } else
+        {
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        }
         Un1[i,]  <- esteqn(beta      = beta, 
                            GC        = GC.boot, 
                            data.simu = data[samp.idx,])
@@ -196,15 +222,24 @@ svBootstrap <- function(beta, esteqn, B, nobs,
       for (i in 1:B) 
       {
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
-        GC.boot  <- genKMCensoringFunc(survival[samp.idx,])
+        
+        if (dependent.censoring)
+        {
+          GC.boot <- genKMCensoringFunc(survival[samp.idx,], cox = TRUE, 
+                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc]))[samp.idx,] )
+        } else 
+        {
+          GC.boot <- genKMCensoringFunc(survival[samp.idx,])
+        }
+        
         Un1[i,]  <- esteqn(beta       = beta, 
                            GC         = GC.boot, 
                            survival   = survival[samp.idx,],
                            X          = X[samp.idx,], 
                            ZXmat      = ZXmat[samp.idx,], 
-                           conf.x.loc = conf.x.loc,
-                           multiplier.wts = Mb[,i])
+                           conf.x.loc = conf.x.loc)
       }
+      
     }
     #varG <- VarFunc(time.t)
     #varG <- sum(varG[!is.nan(varG)]^2) * nobs * nobs
@@ -218,17 +253,9 @@ svBootstrap <- function(beta, esteqn, B, nobs,
   }
     
 
-  if (is.ipcw) 
-  {
-    V <- var(Un1)
-    #VG <- varG * diag(ncol(V))
-    #V <- V + VG
-  } else 
-  {
-    V <- var(Un1)
-  }
+  V <- var(Un1)
+  
   print(attr(esteqn, "name"))
-  #print(V)
   #print(solve(V))
   ##############Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
   
@@ -273,14 +300,7 @@ svBootstrap <- function(beta, esteqn, B, nobs,
   }
   
   sigma.hat <- solve(var(Un2))
-  if (is.ipcw) 
-  {
-    sigma.hat <- sigma.hat
-    se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
-  } else 
-  {
-    se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
-  }
+  se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
   
   list(se.hat = se.hat, var = sigma.hat, V = V)  
 }
@@ -366,7 +386,7 @@ bootstrapVarUnivar <- function(est,
 
 bootstrapVar <- function(fitted.obj, data, 
                          method = c("ls", "sv", "full.bootstrap"), 
-                         B = 1000L) 
+                         B = 1000L, dependent.censoring = FALSE) 
 {
   # takes a fitted aft.fit object and computes estimated variance using
   # a bootstrap approach. supports 2 fast multiplier boostrap techniques
@@ -431,7 +451,13 @@ bootstrapVar <- function(fitted.obj, data,
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
     {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, cbind(data$X, data$Z))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
       bs <- lsBootstrap(beta = fitted.obj$par, 
                         esteqn = est.eqn, 
                         B = B, 
@@ -457,7 +483,13 @@ bootstrapVar <- function(fitted.obj, data,
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
     {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, cbind(data$X, data$Z))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
       bs <- svBootstrap(beta = fitted.obj$par, 
                         esteqn = est.eqn, 
                         B = B, 
@@ -630,6 +662,7 @@ svBootstrapOld <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...
 bootstrapVarEstEqn <- function(est, data, 
                                est.eqn, 
                                method = c("ls", "sv", "full.bootstrap"), 
+                               dependent.censoring = FALSE,
                                B = 1000L) 
 {
   # takes a fitted aft.fit object and computes estimated variance using
@@ -688,7 +721,14 @@ bootstrapVarEstEqn <- function(est, data,
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
     {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, cbind(data$X, data$Z))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
+      
       bs <- lsBootstrap(beta = fitted.obj$par, 
                         esteqn = est.eqn, 
                         B = B,
@@ -713,7 +753,13 @@ bootstrapVarEstEqn <- function(est, data,
     if (attr(est.eqn, "name") == "AFTivIPCWScorePre") 
     {
       #generate function G_c() for ICPW 
-      GC <- genKMCensoringFunc(data$survival)
+      if (dependent.censoring)
+      {
+        GC <- genKMCensoringFunc(data$survival, cox = TRUE, cbind(data$X, data$Z))
+      } else 
+      {
+        GC <- genKMCensoringFunc(data$survival)
+      }
       bs <- svBootstrap(beta = fitted.obj$par, 
                         esteqn = est.eqn, 
                         B = B, 

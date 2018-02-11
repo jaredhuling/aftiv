@@ -273,7 +273,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     #                       (ZXmat[,i]/n - (at.risk.mat[,i + 1]/n)/at.risk.terms  )) / sqrt(n)
     # }
     
-    ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+    ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
                         (ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n) / at.risk.terms)  ) / sqrt(n)
     
     # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
@@ -293,7 +293,7 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     #                       (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
     # }
     
-    ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+    ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
                          (ZXmat/n - ((multiplier.wts / at.risk.terms) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)
     
     # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *

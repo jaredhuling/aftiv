@@ -228,7 +228,8 @@ aftfit <- function(formula,
       }
       
       # bootstrap estimate
-      bootstrap.objects[[e]] <- bootstrapVar(est, surv.dat, B = B, method = boot.method)
+      bootstrap.objects[[e]] <- bootstrapVar(est, surv.dat, B = B, method = boot.method, 
+                                             dependent.censoring = dependent.censoring)
       se.hat[e, ]            <- bootstrap.objects[[e]]$se.hat
     }
     
