@@ -70,7 +70,8 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
                            survival   = survival[samp.idx,],
                            X          = X[samp.idx,], 
                            ZXmat      = ZXmat[samp.idx,], 
-                           conf.x.loc = conf.x.loc)
+                           conf.x.loc = conf.x.loc,
+                           multiplier.wts = Mb[,i])
       }
     }
     
@@ -90,9 +91,7 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
     if (is.ipcw) 
     {
       cat("V:", V, "\n")
-      print(rt)
-      print(1 / rt)
-      Zb <- (1/rt) * (matrix(2 * rbinom(p * B, 1, 0.5) - 1, ncol = p))
+      Zb <- (1/rt) * (matrix(rnorm(p * B), ncol = p))
     } else 
     {
       Zb <- (1/rt) * (matrix(rnorm(p * B), ncol = p))
@@ -102,9 +101,10 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
   {
     if (is.ipcw) 
     {
-      eeg <- eigen(V)
-      rt  <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
-      Zb  <- t(rt %*% t(matrix(rnorm(p * B), ncol = p)))
+      # eeg <- eigen(V)
+      # rt  <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
+      # Zb  <- t(rt %*% t(matrix(rnorm(p * B), ncol = p)))
+      Zb <- matrix(rnorm(p * B), ncol = p)
     } else  
     {
       Zb <- matrix(rnorm(p * B), ncol = p)
@@ -120,8 +120,8 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
   if (is.ipcw) 
   {
     #time.t <- list(...)[["data.simu"]]
-    delta  <- data$delta
-    time.t <- data$t
+    #delta  <- data$delta
+    #time.t <- data$t
     Un1    <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), GC = GC, ...) ))
   } else 
   {
@@ -136,22 +136,7 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
   AA.inv <- solve(AA)
   
   
-  if (is.ipcw) 
-  {
-    
-    #VG <- varG * diag(ncol(V))
-    #V <- V + VG
-    #print(VG)
-    #print(sqrt(V/nobs))
-    variance <- AA.inv %*% V %*% t(AA.inv)
-    
-    #print(variance)
-    #variance <- variance + VG
-    #print(VG)
-  } else 
-  {
-    variance <- AA.inv %*% V %*% t(AA.inv)
-  }
+  variance <- AA.inv %*% V %*% t(AA.inv)
     
   
   se.hat <- sqrt(diag(variance)) / sqrt(nobs)
@@ -167,10 +152,13 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
        V      = V)
 }
 
-svBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...) 
+svBootstrap <- function(beta, esteqn, B, nobs, 
+                        GC = NULL, VarFunc = NULL, 
+                        var.method = c("binomial", "normal"), ...) 
 {
   p  <- length(beta)
   Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
+  var.method <- match.arg(var.method)
   
   is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
     attr(esteqn, "name") == "AFTivIPCWScorePre"
@@ -252,15 +240,21 @@ svBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...)
     #Zb <- rt * (matrix(2 * rnorm(p * B) - 1, ncol = p))
   } else 
   {
-    eeg <- eigen(V)
-    rt  <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
-    if (is.ipcw) 
+    if (var.method == "binomial")
     {
-      #Zb <- t(rt %*% t(3 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1.5)) / ( log(log(nobs)) )
-      Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
-    } else 
+      eeg <- eigen(V)
+      rt  <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
+      if (is.ipcw) 
+      {
+        #Zb <- t(rt %*% t(3 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1.5)) / ( log(log(nobs)) )
+        Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+      } else 
+      {
+        Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+      }
+    } else
     {
-      Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+      Zb <- mvrnorm(B, rep(0, p), Sigma = solve(V))
     }
   }
   
@@ -287,9 +281,6 @@ svBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...)
   {
     se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
   }
-  cat("The est: ", beta, "\n")
-  print("The variance: ")
-  print(se.hat)
   
   list(se.hat = se.hat, var = sigma.hat, V = V)  
 }

@@ -172,9 +172,9 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
     } else if (confounding.function == "exponential") {
       X <- Z2XCoef * exp(Z.append) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "sine") {
-      X <- Z2XCoef * (Z.append + sin(Z.append * pi)) + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef * (sin(Z.append * pi)) + (U2XCoef * U.append) + rand.mat
     } else if (confounding.function == "square") {
-      X <- Z2XCoef * (Z.append - 1 * Z.append^2) + (U2XCoef * U.append) + rand.mat
+      X <- Z2XCoef * (Z.append^2) + (U2XCoef * U.append) + rand.mat
     } else {
       X <- Z2XCoef * Z.append + U2XCoef * U.append + rand.mat
     }

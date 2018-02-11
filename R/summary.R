@@ -35,11 +35,14 @@ summary.aftfits <- function(object,  conf.int = 0.95,
       z <- qnorm((1 + conf.int)/2, 0, 1)
       beta[i,] <- beta[i,] * scale
       se[i,] <- se[i,] * scale
-      tmp <- cbind(beta[i,], beta[i,] - z * se[i,],
+      tmp <- cbind(beta[i,], 
+                   se[i,], 
+                   beta[i,] - z * se[i,],
                    beta[i,] + z * se[i,])
       dimnames(tmp) <- list(names(beta[i,]), c("coef",
-                                           paste("lower .", round(100 * conf.int, 2), sep = ""),
-                                           paste("upper .", round(100 * conf.int, 2), sep = "")))
+                                               "se(coef)",
+                                               paste("lower .", round(100 * conf.int, 2), sep = ""),
+                                               paste("upper .", round(100 * conf.int, 2), sep = "")))
       rval$conf.int <- tmp
     }
     if (is.R()) class(rval)    <-"summary.aftfit"
@@ -78,7 +81,8 @@ summary.aftfits <- function(object,  conf.int = 0.95,
   #}
   
   
-  if (return.summary) {
+  if (return.summary) 
+  {
     return(rval.list)
   }
 }

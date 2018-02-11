@@ -262,12 +262,22 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     
     #generate empty vector to return eventually
     ret.vec <- numeric(nvars)
-    for (i in 1:nvars) 
-    {
-      #return the score   
-      ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                          (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
-    }
+    
+    ## here's what it looks like in the slow, loop way
+    # for (i in 1:nvars) 
+    # {
+    #   #return the score   
+    #   # ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
+    #   #                     (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n)
+    #   ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
+    #                       (ZXmat[,i]/n - (at.risk.mat[,i + 1]/n)/at.risk.terms  )) / sqrt(n)
+    # }
+    
+    ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+                        (ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n) / at.risk.terms)  ) / sqrt(n)
+    
+    # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+    #                      (at.risk.terms * ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n))  ) / sqrt(n)
   } else 
   {
     ZXmatm <- ZXmat * multiplier.wts
@@ -276,12 +286,18 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     
     #generate empty vector to return eventually
     ret.vec <- numeric(nvars)
-    for (i in 1:nvars) 
-    {
-      #return the score   
-      ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
-                          (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
-    }
+    # for (i in 1:nvars) 
+    # {
+    #   #return the score   
+    #   ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * 
+    #                       (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
+    # }
+    
+    ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+                         (ZXmat/n - ((multiplier.wts / at.risk.terms) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)
+    
+    # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
+    #                      (at.risk.terms * ZXmat/n - ((multiplier.wts / 1) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)
   }
   
   ret.vec
@@ -911,7 +927,7 @@ evalAFTivIPCWScorePrec <- function(data.simu, beta, GC, multiplier.wts = NULL)
   {
     #return the score   ##mean(data.simu$GCT) * 
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * 
-                 (data.simu$IPCW.at.risk.terms * data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
+                 (data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
   }
 }
 vEvalAFTivIPCWScorePrec <- Vectorize(evalAFTivIPCWScorePrec, vectorize.args = "beta")
