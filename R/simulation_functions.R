@@ -29,6 +29,7 @@ norta <- function(N = N, cor.matrix = cor.matrix, conf.corr.X = 0, instrument.st
 genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                       survival.distribution = c("exponential", "normal"),
                       confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
+                      dichotomous.exposure = FALSE,
                       break2sls = FALSE, break.method = c("collider", "error", "error.u", "z.on.y"), 
                       error.amount = 0.01) 
 {
@@ -67,20 +68,41 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   #U <- U / sd(U)
   Z <- rnorm(N, sd = 1)
   #Z <- Z / sd(Z)
-  if (break2sls & break.method == "error") {
-    X <- switch(confounding.function,
-                linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                inverted = (Z2XCoef * Z / abs(sin(Z))) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
-                square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
+  if (dichotomous.exposure)
+  {
+    if (break2sls & break.method == "error") {
+      zb <- switch(confounding.function,
+                  linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err,
+                  inverted = (Z2XCoef * Z / abs(sin(Z))) + (U2XCoef * U) + error.amount * err,
+                  exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + error.amount * err,
+                  square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err)
+    } else {
+      zb <- switch(confounding.function,
+                  linear = Z2XCoef * Z + (U2XCoef * U),
+                  inverted = Z2XCoef * Z / (1 + abs(Z)) + (U2XCoef * U),
+                  exponential = Z2XCoef * exp(Z) + (U2XCoef * U),
+                  sine = Z2XCoef * (Z + sin(Z * pi)) + (U2XCoef * U),
+                  square = Z2XCoef * (Z - 1 * Z^2) + (U2XCoef * U))
+      #X <- X/sd(X)
+    }
+    prob <- 1 / (1 + exp(-zb))
+    X <- rbinom(NROW(Z), 1, prob)
   } else {
-    X <- switch(confounding.function,
-                linear = Z2XCoef * Z + (U2XCoef * U) + rnorm(N, sd = 1),
-                inverted = Z2XCoef * Z / (1 + abs(Z)) + (U2XCoef * U) + rnorm(N, sd = 1),
-                exponential = Z2XCoef * exp(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
-                sine = Z2XCoef * (Z + sin(Z * pi)) + (U2XCoef * U) + rnorm(N, sd = 1),
-                square = Z2XCoef * (Z - 1 * Z^2) + (U2XCoef * U) + rnorm(N, sd = 1))
-    #X <- X/sd(X)
+    if (break2sls & break.method == "error") {
+      X <- switch(confounding.function,
+                  linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                  inverted = (Z2XCoef * Z / abs(sin(Z))) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                  exponential = (Z2XCoef * Z) * exp(U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
+                  square = (Z2XCoef * Z) * (U2XCoef * U)^2 + error.amount * err + rnorm(N, sd = 1))
+    } else {
+      X <- switch(confounding.function,
+                  linear = Z2XCoef * Z + (U2XCoef * U) + rnorm(N, sd = 1),
+                  inverted = Z2XCoef * Z / (1 + abs(Z)) + (U2XCoef * U) + rnorm(N, sd = 1),
+                  exponential = Z2XCoef * exp(Z) + (U2XCoef * U) + rnorm(N, sd = 1),
+                  sine = Z2XCoef * (Z + sin(Z * pi)) + (U2XCoef * U) + rnorm(N, sd = 1),
+                  square = Z2XCoef * (Z - 1 * Z^2) + (U2XCoef * U) + rnorm(N, sd = 1))
+      #X <- X/sd(X)
+    }
   }
   #X <- X / sd(X)
   
@@ -206,13 +228,14 @@ simIVSurvivalData <- function(sample.size,
                               norta = FALSE,
                               betax.cens, 
                               betaz.cens,
+                              dichotomous.exposure = FALSE,
                               survival.distribution = c("exponential", "normal"),
                               confounding.function = c("linear", "inverted", "exponential", "square", "sine"),
                               dependent.censoring = FALSE,
                               break2sls = FALSE, 
                               break.method = c("collider", "error", "error.u", "z.on.y"),
                               error.amount = 0.01, 
-                              cens.distribution = c("exp", "lognormal", "weibull", "unif")) 
+                              cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed")) 
 {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
@@ -222,8 +245,11 @@ simIVSurvivalData <- function(sample.size,
   break.method <- match.arg(break.method)
   cens.distribution <- match.arg(cens.distribution)
   
-  stopifnot(length(beta1) == length(betax.cens))
-  stopifnot(length(betaz.cens) == 1)
+  if (dependent.censoring)
+  {
+    stopifnot(length(beta1) == length(betax.cens))
+    stopifnot(length(betaz.cens) == 1)
+  }
   
   if (norta)
   {
@@ -243,6 +269,7 @@ simIVSurvivalData <- function(sample.size,
                       confounding.function = confounding.function,
                       survival.distribution = surv.dist, 
                       break2sls = break2sls, 
+                      dichotomous.exposure = dichotomous.exposure,
                       break.method = break.method,
                       error.amount = error.amount)
   }
@@ -315,6 +342,10 @@ simIVSurvivalData <- function(sample.size,
     {
       Cen.time <- exp(runif(sample.size, min = min(min(log(Fail.time))),
                                      max = 1 * quantile(log(vars$Y), prob = c(0.98))))
+    } else if (cens.distribution == "fixed")
+    {
+      mean.fail <- mean(Fail.time)
+      Cen.time <- rep(mean.fail, NROW(Fail.time)) + runif(NROW(Fail.time))
     }
   }
   plot(density(Fail.time), ylim = c(0, 1) , xlim = c(0, quantile(vars$Y, prob = c(0.975))))
@@ -326,10 +357,11 @@ simIVSurvivalData <- function(sample.size,
   
   #failure indicator
   delta <- 1 * (Cen.time >= Fail.time)
+  
   # you can also use X<- pmin(Fail.time, Cen.time)
   t <- apply(data.frame(Fail.time, Cen.time), 1, min)
   #return variables in data.frame
-  data.simu <- data.frame(t, delta, X, Z)
+  data.simu <- data.frame(t, delta, X, Z, Fail.time, Cen.time)
   #store correlations as attribute
   attr(data.simu, "cor") <- cor(vars)
   data.simu
@@ -457,6 +489,7 @@ SimIVDataCompareEstimators <- function(type,
                                        lambda, 
                                        beta0, 
                                        beta1, 
+                                       dichotomous.exposure = FALSE,
                                        seed = NULL, 
                                        norta=FALSE, 
                                        betax.cens, 
@@ -471,7 +504,7 @@ SimIVDataCompareEstimators <- function(type,
                                        break.method = c("collider", "error", "error.u", "z.on.y"), 
                                        error.amount = 0.01,
                                        dependent.censoring = FALSE, 
-                                       cens.distribution = c("exp", "lognormal", "weibull", "unif"))
+                                       cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"))
 {
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
@@ -486,9 +519,9 @@ SimIVDataCompareEstimators <- function(type,
   boot.method <- match.arg(boot.method)
   
   #check to make sure user specified allowed estimating equations
-  types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW", "AFT-2SLS-xhat")
-  funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScorePrec", "vEvalAFTivIPCWScorePrec", "vEvalAFT2SLSxhatScore")
-  for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
+  types <- c("AFT", "AFT-IV", "AFT-2SLS", "AFT-IPCW", "AFT-2SLS-xhat", "RnT")
+  funcs <- c("vEvalAFTScore", "vEvalAFTivScore", "vEvalAFT2SLSScorePrec", "vEvalAFTivIPCWScorePrec", "vEvalAFT2SLSxhatScore", "vEvalRnTAFTivScore")
+  for (i in length(type)) {if (!is.element(type[i], types)) {stop("'type' must only contain 'AFT', 'RnT, 'AFT-IV',' AFT-2SLS' or 'AFT-IPCW'")}}
   
   #if (bootstrap) {
     #warning("Bootstrap does not work yet")
@@ -516,6 +549,7 @@ SimIVDataCompareEstimators <- function(type,
                                      norta = FALSE,
                                      betax.cens = betax.cens, 
                                      betaz.cens = betaz.cens,
+                                     dichotomous.exposure = dichotomous.exposure,
                                      survival.distribution = survival.distribution, 
                                      confounding.function = confounding.function,
                                      dependent.censoring = dependent.censoring,
@@ -569,7 +603,7 @@ SimIVDataCompareEstimators <- function(type,
           n.riskFunc  <- NULL
           #solve for beta using bisection method
           beta.tmp[e] <- uniroot(est.eqn, 
-                                 interval = c(beta1 - 2, beta1 + 2), 
+                                 interval = c(beta1 - 3, beta1 + 3), 
                                  tol = 0.001, 
                                  "data.simu" = Data.simu)$root
         }
@@ -841,7 +875,8 @@ simulateGrid <- function(est.eqns,
                          bootstrap = FALSE, 
                          boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
-                         dependent.censoring   = FALSE,
+                         dependent.censoring  = FALSE,
+                         dichotomous.exposure = FALSE,
                          confounding.function  = c("linear", "inverted", "exponential", "square", "sine"),
                          break2sls = FALSE, 
                          break.method = c("collider", "error", "error.u", "z.on.y"),
@@ -849,7 +884,7 @@ simulateGrid <- function(est.eqns,
                          use.uniroot = TRUE, 
                          betax.cens,
                          betaz.cens,
-                         cens.distribution = c("exp", "lognormal", "weibull", "unif")) 
+                         cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed")) 
 {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
@@ -879,6 +914,7 @@ simulateGrid <- function(est.eqns,
                                         bootstrap = bootstrap, boot.method = boot.method,
                                         survival.distribution = survival.distribution, 
                                         dependent.censoring = dependent.censoring,
+                                        dichotomous.exposure = dichotomous.exposure, 
                                         confounding.function = confounding.function, break2sls = break2sls,
                                         break.method = break.method, error.amount = error.amount,
                                         cens.distribution = cens.distribution)

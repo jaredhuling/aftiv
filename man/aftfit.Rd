@@ -8,7 +8,7 @@ aftfit(formula, data, instrument, confounded.x.names, method = c("AFT",
   "AFT-IV", "AFT-2SLS", "AFT-IPCW"), smoothed = FALSE, weights = NULL,
   bootstrap = FALSE, boot.method = c("ls", "sv", "full.bootstrap"),
   B = 1000L, dependent.censoring = FALSE, na.action, init = NULL,
-  return.data = FALSE, tol = 1e-05, maxit = 100L, verbose = 0,
+  return.data = FALSE, tol = 1e-05, maxit = 10L, verbose = 0,
   BB.control = NULL, ...)
 }
 \arguments{

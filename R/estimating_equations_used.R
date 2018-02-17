@@ -208,6 +208,14 @@ AFTivScorePre <- function(beta, survival, X, ZXmat, multiplier.wts = NULL)
 }
 attr(AFTivScorePre, "name") <- "AFTivScorePre"
 
+
+
+
+
+
+
+
+
 AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf.x.loc, multiplier.wts = NULL)
 { 
   
@@ -658,6 +666,68 @@ vEvalAFTivScore <- Vectorize(evalAFTivScore, vectorize.args = "beta")
 attr(vEvalAFTivScore, "name") <- "evalAFTivScore"
 
 
+
+### R & T 1991
+
+
+evalRnTAFTivScore <- function(data.simu, beta, multiplier.wts = NULL)
+{ 
+  #the score function for the AFT model with instrumental variables
+  
+  #transform to log-time
+  #data.simu$t <- log(data.simu$t)
+  
+  n.obs <- nrow(data.simu)
+  
+  #store the T_i - bX_i term (error)
+  xbeta <- beta * data.simu$X
+  data.simu$UistarBeta <- data.simu$t * exp(xbeta)
+  
+  data.simu$CiBeta <- ifelse(beta < 0, data.simu$Cen.time * exp(beta), data.simu$Cen.time)
+  
+  data.simu$XiBeta <- pmin(data.simu$UistarBeta, data.simu$CiBeta)
+  
+  #sort according to error size Xi(Beta)
+  #data.simu <- data.simu[order(data.simu$X),]   
+  ord.idx   <- order(data.simu$XiBeta)
+  data.simu <- data.simu[ord.idx,] 
+  
+  delta     <- 1 * (data.simu$UistarBeta < data.simu$CiBeta)
+  
+  delta <- data.simu$delta
+  
+  #the denominator of the at-risk comparison term  
+  at.risk.terms <- n.obs:1
+  
+  if (!is.null(multiplier.wts)) 
+  {
+    multiplier.wts <- multiplier.wts[ord.idx]
+    #the numerator of the at-risk comparison term  
+    at.risk.Z.terms <- cumsumRev(data.simu$Z * multiplier.wts)
+    
+    #return the score   
+    return(  sum(delta * (data.simu$Z * multiplier.wts - at.risk.Z.terms / at.risk.terms)) / sqrt(n.obs)  )
+  } else 
+  {
+    #the numerator of the at-risk comparison term  
+    at.risk.Z.terms <- cumsumRev(data.simu$Z)
+    
+    #return the score   
+    return(  sum(delta * (at.risk.terms * data.simu$Z - at.risk.Z.terms)) / sqrt(n.obs)  )
+  }
+  
+}
+vEvalRnTAFTivScore <- Vectorize(evalRnTAFTivScore, vectorize.args = "beta")
+attr(vEvalRnTAFTivScore, "name") <- "evalRnTAFTivScore"
+
+
+
+###
+
+
+
+
+
 evalAFT2SLSScorePrec <- function(data.simu, beta, multiplier.wts = NULL)
 { 
   #the score function for the AFT model with instrumental variables
@@ -921,13 +991,15 @@ evalAFTivIPCWScorePrec <- function(data.simu, beta, GC, multiplier.wts = NULL)
   if (is.null(multiplier.wts)) 
   {
     #return the score   ##mean(data.simu$GCT) * 
+    # return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
+    #              (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
-                 (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
+                 (data.simu$IPCW.at.risk.terms * data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
   } else 
   {
     #return the score   ##mean(data.simu$GCT) * 
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * 
-                 (data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
+                 (data.simu$IPCW.at.risk.terms * data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
   }
 }
 vEvalAFTivIPCWScorePrec <- Vectorize(evalAFTivIPCWScorePrec, vectorize.args = "beta")
