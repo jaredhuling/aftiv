@@ -637,7 +637,6 @@ evalAFTivScore <- function(data.simu, beta, multiplier.wts = NULL)
   data.simu$err = data.simu$t - beta * data.simu$X
   
   #sort according to error size ####observed failure time 
-  #data.simu <- data.simu[order(data.simu$X),]   
   ord.idx <- order(data.simu$err)
   data.simu <- data.simu[ord.idx,] 
   
@@ -680,21 +679,25 @@ evalRnTAFTivScore <- function(data.simu, beta, multiplier.wts = NULL)
   n.obs <- nrow(data.simu)
   
   #store the T_i - bX_i term (error)
-  xbeta <- beta * data.simu$X
-  data.simu$UistarBeta <- data.simu$t * exp(xbeta)
+  xbeta <- drop(beta * data.simu$X)
+  data.simu$UistarBeta <- drop(data.simu$t * exp(xbeta))
   
   data.simu$CiBeta <- ifelse(beta < 0, data.simu$Cen.time * exp(beta), data.simu$Cen.time)
   
   data.simu$XiBeta <- pmin(data.simu$UistarBeta, data.simu$CiBeta)
   
   #sort according to error size Xi(Beta)
-  #data.simu <- data.simu[order(data.simu$X),]   
   ord.idx   <- order(data.simu$XiBeta)
   data.simu <- data.simu[ord.idx,] 
   
-  delta     <- 1 * (data.simu$UistarBeta < data.simu$CiBeta)
   
-  delta <- data.simu$delta
+  
+  # print(paste(mean(delta), " ", mean(drop(1 * (data.simu$UistarBeta < data.simu$CiBeta)))))
+  
+  # delta <- drop(1 * (data.simu$UistarBeta < data.simu$CiBeta))
+  
+  delta <- ifelse(data.simu$CiBeta < data.simu$UistarBeta, 0, data.simu$delta)
+  
   
   #the denominator of the at-risk comparison term  
   at.risk.terms <- n.obs:1
@@ -713,7 +716,7 @@ evalRnTAFTivScore <- function(data.simu, beta, multiplier.wts = NULL)
     at.risk.Z.terms <- cumsumRev(data.simu$Z)
     
     #return the score   
-    return(  sum(delta * (at.risk.terms * data.simu$Z - at.risk.Z.terms)) / sqrt(n.obs)  )
+    return(  sum(delta * 1 * (data.simu$Z - at.risk.Z.terms / at.risk.terms)) / sqrt(n.obs)  )
   }
   
 }
@@ -994,12 +997,12 @@ evalAFTivIPCWScorePrec <- function(data.simu, beta, GC, multiplier.wts = NULL)
     # return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
     #              (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
-                 (data.simu$IPCW.at.risk.terms * data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
+                 (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
   } else 
   {
     #return the score   ##mean(data.simu$GCT) * 
     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * 
-                 (data.simu$IPCW.at.risk.terms * data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms)) / (sqrt(nn)))
+                 (data.simu$Z * multiplier.wts/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
   }
 }
 vEvalAFTivIPCWScorePrec <- Vectorize(evalAFTivIPCWScorePrec, vectorize.args = "beta")

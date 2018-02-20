@@ -17,7 +17,8 @@ Depends:
   grid, 
   SimCorMultRes, 
   MASS, 
-  nleqslv
+  nleqslv,
+  rpsftm
 Imports:
   methods
 Suggests: ggplot2

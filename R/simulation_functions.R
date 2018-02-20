@@ -43,7 +43,13 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
   
   N <- as.integer(N)
   
-  
+  if (dichotomous.exposure)
+  {
+    sd.Y <- 1
+  } else
+  {
+    sd.Y <- 1
+  }
   if (break2sls) {
     if (break.method == "collider") {
       uy.confounder <- rnorm(N)
@@ -61,15 +67,16 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
     }
   } else {
     U <- rnorm(N, sd = 1)
-    err <- rnorm(N)
+    err <- rnorm(N, sd = sd.Y)
   }
   
   
   #U <- U / sd(U)
-  Z <- rnorm(N, sd = 1)
+  
   #Z <- Z / sd(Z)
   if (dichotomous.exposure)
   {
+    Z <- rbinom(N, 1, 0.5)
     if (break2sls & break.method == "error") {
       zb <- switch(confounding.function,
                   linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err,
@@ -85,9 +92,10 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
                   square = Z2XCoef * (Z - 1 * Z^2) + (U2XCoef * U))
       #X <- X/sd(X)
     }
-    prob <- 1 / (1 + exp(-zb))
-    X <- rbinom(NROW(Z), 1, prob)
+    #prob <- 1 / (1 + exp(-zb))
+    X <- 1 * (sign(beta1)*zb > rnorm(N, sd = 0.5))
   } else {
+    Z <- rnorm(N, sd = 1)
     if (break2sls & break.method == "error") {
       X <- switch(confounding.function,
                   linear = (Z2XCoef * Z) + (U2XCoef * U) + error.amount * err + rnorm(N, sd = 1),
@@ -122,7 +130,7 @@ genIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta0 = 0, beta1 = 1,
     } else if (break.method == "z.on.y") {
       Y <- switch(surv.dist,
                   exponential = rexp(N, rate = exp(-(beta0 + beta1 * X + U2YCoef * U + error.amount * Z))),
-                  normal = exp( ( beta0 + beta1 * X + U2YCoef * U + error.amount * Z + err) ))
+                  normal = exp( ( beta0 + beta1 * X + sign(beta1) * U2YCoef * U + error.amount * Z + err) ))
     } else {
       Y <- exp(beta0 + beta1 * X + U2YCoef * U + err)
     }
@@ -235,7 +243,8 @@ simIVSurvivalData <- function(sample.size,
                               break2sls = FALSE, 
                               break.method = c("collider", "error", "error.u", "z.on.y"),
                               error.amount = 0.01, 
-                              cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed")) 
+                              cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"),
+                              plotcens = TRUE) 
 {
   #conf.corr.X == confounder correlation with X
   #conf.corr.Y == confounder correlation with Y
@@ -344,13 +353,16 @@ simIVSurvivalData <- function(sample.size,
                                      max = 1 * quantile(log(vars$Y), prob = c(0.98))))
     } else if (cens.distribution == "fixed")
     {
-      mean.fail <- mean(Fail.time)
-      Cen.time <- rep(mean.fail, NROW(Fail.time)) + runif(NROW(Fail.time))
+      mean.fail <- quantile(Fail.time, probs = 0.5)
+      Cen.time <- rep(mean.fail, NROW(Fail.time)) + runif(NROW(Fail.time), max = 0.025, min = -0.025)
     }
   }
-  plot(density(Fail.time), ylim = c(0, 1) , xlim = c(0, quantile(vars$Y, prob = c(0.975))))
-  lines(density(Cen.time), col = "blue")
-  plot(density(Cen.time - Fail.time))
+  if (plotcens)
+  {
+    plot(density(Fail.time), ylim = c(0, 1) , xlim = c(0, quantile(vars$Y, prob = c(0.975))))
+    lines(density(Cen.time), col = "blue")
+    plot(density(Cen.time - Fail.time))
+  }
   #Cen.time <- pmin(Cen.time, quantile(Cen.time, prob = 0.99))
   
   
@@ -504,7 +516,8 @@ SimIVDataCompareEstimators <- function(type,
                                        break.method = c("collider", "error", "error.u", "z.on.y"), 
                                        error.amount = 0.01,
                                        dependent.censoring = FALSE, 
-                                       cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"))
+                                       cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"),
+                                       plotcens = TRUE)
 {
   # This function simulates ('n.sims'-times) survival data with a confounding variable U and an instrument Z
   # and estimates beta using the regular AFT estimating equation and also using the IV estimating equation
@@ -556,7 +569,8 @@ SimIVDataCompareEstimators <- function(type,
                                      break2sls = break2sls, 
                                      break.method = break.method,
                                      error.amount = error.amount, 
-                                     cens.distribution = cens.distribution)
+                                     cens.distribution = cens.distribution,
+                                     plotcens = plotcens)
 
       beta.tmp <- array(0, dim = length(type))
       coverage.tmp <- array(NA, dim = length(type))
@@ -591,21 +605,108 @@ SimIVDataCompareEstimators <- function(type,
           VarFunc    <- GC.list[[2]]
           n.riskFunc <- GC.list[[3]]
           #solve for beta using bisection method
-          beta.tmp[e] <- uniroot(est.eqn, 
-                                 interval = c(beta1 - 2, beta1 + 2), 
-                                 tol = 0.001, 
-                                 "data.simu" = Data.simu, 
-                                 "GC" = GC)$root
+          
+          est.eqn.sq <- function(beta, data.simu) sum((est.eqn(beta = beta, data.simu = data.simu, GC = GC)) ^ 2)
+          
+          vals <- est.eqn(beta = c(beta1 - 2, beta1 + 2), data.simu = Data.simu, GC = GC)
+          if (all(vals > 0) | all(vals < 0))
+          {
+            beta.tmp[e] <- optimize(est.eqn.sq,
+                                    interval = c(beta1 - 2, beta1 + 2),
+                                    data.simu = Data.simu,
+                                    GC = GC)$minimum
+          } else
+          {
+            beta.tmp[e] <- uniroot(est.eqn, 
+                                   interval = c(beta1 - 2, beta1 + 2), 
+                                   tol = 0.0001, 
+                                   "data.simu" = Data.simu, 
+                                   "GC" = GC)$root
+          }
+          
+          
         } else 
         {
           GC          <- NULL
           VarFunc     <- NULL
           n.riskFunc  <- NULL
           #solve for beta using bisection method
-          beta.tmp[e] <- uniroot(est.eqn, 
-                                 interval = c(beta1 - 3, beta1 + 3), 
-                                 tol = 0.001, 
-                                 "data.simu" = Data.simu)$root
+          #beta.tmp[e] <- uniroot(est.eqn,
+          #                       interval = c(beta1 - 2, beta1 + 2),
+          #                       tol = 0.0001,
+          #                       "data.simu" = Data.simu)$root
+          est.eqn.sq <- function(beta, data.simu) sum((est.eqn(beta = beta, data.simu = data.simu)) ^ 2)
+          
+          
+          
+          # if (attr(est.eqn, "name") == "evalRnTAFTivScore")
+          # {
+          #   # this estimating equation is extraordinarily hard to minimize
+          #   # even in 1 dimension
+          #   
+          #   opt.obj <- vector(mode = "list", length = 3)
+          #   
+          #   opt.obj[[1]]  <- optimize(est.eqn.sq, 
+          #                     interval = c(beta1 - 0.5, beta1 + 0.5),
+          #                     data.simu = Data.simu)
+          #   
+          #   opt.obj[[2]]  <- optimize(est.eqn.sq, 
+          #                     interval = c(beta1 - 1, beta1 + 1.1),
+          #                     data.simu = Data.simu)
+          #   
+          #   opt.obj[[3]]  <- optimize(est.eqn.sq, 
+          #                             interval = c(beta1 - 2, beta1 + 2.1),
+          #                             data.simu = Data.simu)
+          #   
+          #   vals <- sapply(opt.obj, function(ob) ob$objective)
+          #   best.val <- which.min(vals)
+          #   print(vals)
+          #   print(sapply(opt.obj, function(ob) ob$minimum))
+          #   beta.tmp[e] <- opt.obj[[best.val]]$minimum
+          #   
+          # the parameter for R & T 1991 is negative that of the AFT model
+          if (attr(est.eqn, "name") == "evalRnTAFTivScore")
+          {
+
+            
+            beta.tmp[e] <- rpsftm(formula=Surv(t, delta) ~ rand(Z, X), 
+                                  data=Data.simu,
+                                  low_psi = -beta1 - 2, hi_psi = -beta1 + 2,
+                                  censor_time=Data.simu$Cen.time)$psi
+            
+            if (is.na(beta.tmp[e]) | is.nan(beta.tmp[e]) | is.null(beta.tmp[e]))
+            {
+              vals <- est.eqn(beta = c(-beta1 - 2, -beta1 + 2), data.simu = Data.simu)
+              if (all(vals > 0) | all(vals < 0))
+              {
+                beta.tmp[e] <- optimize(est.eqn.sq,
+                                        interval = c(-beta1 - 2, -beta1 + 2),
+                                        data.simu = Data.simu)$minimum
+              } else
+              {
+                beta.tmp[e] <- uniroot(est.eqn,
+                                       interval = c(-beta1 - 2, -beta1 + 2),
+                                       tol = 0.0001,
+                                       "data.simu" = Data.simu)$root
+              }
+            }
+              
+          } else
+          {
+            vals <- est.eqn(beta = c(beta1 - 2, beta1 + 2), data.simu = Data.simu)
+            if (all(vals > 0) | all(vals < 0))
+            {
+              beta.tmp[e] <- optimize(est.eqn.sq,
+                                      interval = c(beta1 - 2, beta1 + 2),
+                                      data.simu = Data.simu)$minimum
+            } else
+            {
+              beta.tmp[e] <- uniroot(est.eqn,
+                                     interval = c(beta1 - 2, beta1 + 2),
+                                     tol = 0.0001,
+                                     "data.simu" = Data.simu)$root
+            }
+          }
         }
 
         cat("sim ", l, ", beta = ", beta.tmp[e], "\n")
@@ -884,7 +985,8 @@ simulateGrid <- function(est.eqns,
                          use.uniroot = TRUE, 
                          betax.cens,
                          betaz.cens,
-                         cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed")) 
+                         cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"),
+                         plotcens = TRUE) 
 {
   if (is.null(attr(grid, "grid"))) {stop("Grid must be created with createGrid function")}
   
@@ -917,7 +1019,8 @@ simulateGrid <- function(est.eqns,
                                         dichotomous.exposure = dichotomous.exposure, 
                                         confounding.function = confounding.function, break2sls = break2sls,
                                         break.method = break.method, error.amount = error.amount,
-                                        cens.distribution = cens.distribution)
+                                        cens.distribution = cens.distribution,
+                                        plotcens = plotcens)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res
     }
