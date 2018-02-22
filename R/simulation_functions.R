@@ -516,6 +516,7 @@ SimIVDataCompareEstimators <- function(type,
                                        break.method = c("collider", "error", "error.u", "z.on.y"), 
                                        error.amount = 0.01,
                                        dependent.censoring = FALSE, 
+                                       cens.misspec = FALSE,
                                        cens.distribution = c("exp", "lognormal", "weibull", "unif", "fixed"),
                                        plotcens = TRUE)
 {
@@ -589,7 +590,7 @@ SimIVDataCompareEstimators <- function(type,
         if (type[e] == "AFT-IPCW") 
         {
           #generate function G_c() for ICPW
-          if (dependent.censoring)
+          if (dependent.censoring & !cens.misspec)
           {
             GC.list <- list(genKMCensoringFunc(Data.simu, cox = TRUE, 
                                           X = cbind(Data.simu$X, Data.simu$Z)),
@@ -977,6 +978,7 @@ simulateGrid <- function(est.eqns,
                          boot.method = c("ls", "sv", "full.bootstrap"),
                          survival.distribution = c("exponential", "normal"),
                          dependent.censoring  = FALSE,
+                         cens.misspec = FALSE,
                          dichotomous.exposure = FALSE,
                          confounding.function  = c("linear", "inverted", "exponential", "square", "sine"),
                          break2sls = FALSE, 
@@ -1020,6 +1022,7 @@ simulateGrid <- function(est.eqns,
                                         confounding.function = confounding.function, break2sls = break2sls,
                                         break.method = break.method, error.amount = error.amount,
                                         cens.distribution = cens.distribution,
+                                        cens.misspec = cens.misspec,
                                         plotcens = plotcens)
       for (j in 1:ncol(grid)) {attr(res, colnames(grid)[j]) <- grid[i, j]}
       res
