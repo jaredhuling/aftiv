@@ -1,6 +1,7 @@
 summary.aftfits <- function(object,  conf.int = 0.95, 
                             models = 1:length(object$fit.objects), scale = 1, 
-                            return.summary = FALSE, ...) {
+                            return.summary = FALSE, ...) 
+{
   aft <- object
   beta <- aft$beta
   if (is.null(aft$beta)) {   # Null model

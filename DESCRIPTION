@@ -18,9 +18,10 @@ Depends:
   SimCorMultRes, 
   MASS, 
   nleqslv,
-  rpsftm
+  rpsftm,
+  ggplot2
 Imports:
-  methods
-Suggests: ggplot2
+  methods,
+  stats
 LinkingTo: Rcpp, RcppEigen
 RoxygenNote: 6.0.1

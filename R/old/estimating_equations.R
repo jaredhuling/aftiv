@@ -4,35 +4,152 @@
 ### functions for est eqns    ###
 #################################
 
-library(compiler)
-enableJIT(3)
 
-#this function is used for fast at risk set calculation
-cumsumRev <- function(a) rev(cumsum(rev(a)))
 
-sigmoid <- function(x, tau) {
-  1 / (1 + exp(-x / tau))
+
+
+svBootstrapOld <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, ...) 
+{
+  p  <- length(beta)
+  Mb <- matrix(rexp(nobs * B, rate = 1), ncol = B)
+  
+  is.ipcw <- attr(esteqn, "name") == "evalAFTivIPCWScorePrec" | 
+    attr(esteqn, "name") == "AFTivIPCWScorePre"
+  
+  if (is.ipcw) 
+  {
+    #time.t <- list(...)[["data.simu"]]$t
+    #Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, GC = GC, ...) ))
+    
+    
+    #print("ipcw var1")
+    #print(var(t(Un1) ))
+    
+    Un1 <- array(NA, dim = c(B, p) )
+    if (attr(esteqn, "name") == "evalAFTivIPCWScorePrec") 
+    {
+      data <- list(...)[["data.simu"]]
+      
+      for (i in 1:B) 
+      {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+        Un1[i,]  <- esteqn(beta      = beta, 
+                           GC        = GC.boot, 
+                           data.simu = data[samp.idx,])
+      }
+    } else 
+    {
+      list.dat   <- list(...)
+      survival   <- list.dat[["survival"]]
+      X          <- list.dat[["X"]]
+      ZXmat      <- list.dat[["ZXmat"]]
+      conf.x.loc <- list.dat[["conf.x.loc"]]
+      
+      for (i in 1:B) 
+      {
+        samp.idx <- sample.int(nobs, nobs, replace = TRUE)
+        GC.boot  <- genKMCensoringFunc(survival[samp.idx,])
+        Un1[i,]  <- esteqn(beta       = beta, 
+                           GC         = GC.boot, 
+                           survival   = survival[samp.idx,],
+                           X          = X[samp.idx,], 
+                           ZXmat      = ZXmat[samp.idx,], 
+                           conf.x.loc = conf.x.loc)
+      }
+    }
+    #varG <- VarFunc(time.t)
+    #varG <- sum(varG[!is.nan(varG)]^2) * nobs * nobs
+  } else 
+  {
+    Un1 <- t(apply( Mb, 2, function(x) esteqn(beta = beta, multiplier.wts = x, ...) ))
+    if (p == 1) 
+    {
+      Un1 <- t(Un1)
+    }
+  }
+  
+  
+  if (is.ipcw) 
+  {
+    V <- var(Un1)
+    #VG <- varG * diag(ncol(V))
+    #V <- V + VG
+  } else 
+  {
+    V <- var(Un1)
+  }
+  print(attr(esteqn, "name"))
+  #print(V)
+  #print(solve(V))
+  ##############Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
+  
+  if (p == 1) 
+  {
+    rt <- as.numeric(sqrt(V))
+    if (is.ipcw) 
+    {
+      cat("V:", V, "\n")
+      print(rt)
+      print(1 / rt)
+      Zb <- (1/rt) * (matrix(4 * rbinom(p * B, 1, 0.5) - 2, ncol = p))
+      #Zb <- (1/rt) * (matrix(runif(p * B, min=-2, max=2), ncol = p))
+      #Zb <- (1/rt) * (matrix(rt(p * B, df = 2), ncol = p))
+      Zb <- (2/(rt * (log(nobs)^(0.525)))  ) * (matrix(rnorm(p * B), ncol = p))
+    } else 
+    {
+      cat("V:", V, "\n")
+      Zb <- (1/rt) * (matrix(rnorm(p * B), ncol = p))
+    }
+    #Zb <- rt * (matrix(2 * rnorm(p * B) - 1, ncol = p))
+  } else 
+  {
+    eeg <- eigen(V)
+    rt  <- solve(eeg$vectors %*% diag(sqrt(eeg$values) ) %*% solve(eeg$vectors))
+    if (is.ipcw) 
+    {
+      #Zb <- 2 * t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))/(log(nobs)^(0.525))
+      Zb <- t(rt %*% t(3 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1.5))/(log(log(nobs)) )
+      #Zb <- 2 * t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+    } else 
+    {
+      Zb <- t(rt %*% t(2 * matrix(rbinom(p * B, 1, 0.5), ncol = p) - 1))
+    }
+  }
+  
+  if (is.ipcw) 
+  {
+    Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs),  GC = GC, ...) ))
+    
+  } else 
+  {
+    Un2 <- t(apply( Zb, 1, function(x) esteqn(beta = beta + x / sqrt(nobs), ...) ))
+  }
+  
+  if (p == 1) 
+  {
+    Un2 <- t(Un2)
+  }
+  
+  sigma.hat <- solve(var(Un2))
+  if (is.ipcw) 
+  {
+    sigma.hat <- sigma.hat
+    se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  } else 
+  {
+    se.hat    <- sqrt(diag(sigma.hat)) / sqrt(nobs)
+  }
+  cat("The est: ", beta, "\n")
+  print("The variance: ")
+  print(se.hat)
+  
+  list(se.hat = se.hat, var = sigma.hat, V = V)  
 }
 
-AFT2SLSScorePre <- function(...) {
-  "2SLS"
-}
-attr(AFT2SLSScorePre, "name") <- "AFT2SLSScorePre"
 
-AFT2SLSScoreSmoothPre <- function(...) {
-  "2SLS"
-}
-attr(AFT2SLSScoreSmoothPre, "name") <- "AFT2SLSScoreSmoothPre"
 
-AFT2SLSScoreAllPre <- function(...) {
-  "2SLS"
-}
-attr(AFT2SLSScoreAllPre, "name") <- "AFT2SLSScoreAllPre"
 
-AFT2SLSScoreSmoothAllPre <- function(...) {
-  "2SLS"
-}
-attr(AFT2SLSScoreSmoothAllPre, "name") <- "AFT2SLSScoreSmoothAllPre"
 
 
 evalAFTScore <- function(data.simu, beta, multiplier.wts = NULL)
@@ -1085,73 +1202,6 @@ jacobianAFTivSmooth <- function(beta, data.simu, stdev)
 
 
 
-AFTivIPCWScoreSmooth <- function(beta, data.simu, stdev)
-{ 
-  if (class(data.simu) != "survival.data") {stop("Need to use data generated by simIVMultivarSurvivalData")}
-  
-  #the score function for the AFT model
-  
-  survival <- data.simu$survival
-  X <- data.simu$X
-  Z <- data.simu$Z
-  n <- nrow(X)
-  nvars <- ncol(X)
-  
-  #generate function G_c() for ICPW
-  GC <- genKMCensoringFunc(survival)
-  
-  #transform to log-time
-  survival$t <- log(survival$t)
-  
-  
-  #creates G_c(T_i) term in the IPCW estimating equation
-  survival$GCT <- GC(exp(survival$t))
-  
-  #store the T_i - bX_i term (error)
-  survival$err = survival$t - X %*% beta
-  
-  survival$bX <- X %*% beta
-  
-  #sort according to error size ####observed failure time 
-  #data.simu <- data.simu[order(data.simu$X),]  
-  order.idx <- order(survival$err)
-  survival <- survival[order.idx,] 
-  X <- as.matrix(X[order.idx,])
-  Z <- as.matrix(Z[order.idx,]) 
-  
-  
-  #create indicator to set to zero terms where GCT == 0 and 
-  #set to 1 so no dividing by zero occurs
-  zero.indicator <- 1 * (survival$GCT != 0)
-  survival$GCT[which(survival$GCT == 0)] <- 1
-  
-  
-  #the numerator of the at-risk comparison term 
-  all.at.risk.terms <- lapply(survival$err, function(x) {
-    denom <- GC(exp(survival$bX + x))
-    ind.2.drop <- 1 * (denom != 0)
-    denom[which(denom == 0)] <- 1 #to prevent dividing by 0
-    div.denom <- ind.2.drop * 1 / denom
-    ret <- NULL
-    ret[1] <- sum(pnorm(n^(0.26) * (survival$err - x) / stdev) * div.denom)
-    for (i in 1:nvars) {
-      ret[i + 1] <- sum(Z[,i] * pnorm(n^(0.26) * (survival$err - x) / stdev) * div.denom)
-    }
-    ret
-  })
-  
-  #first col is as.risk.terms, remaining are at.risk.Z.terms
-  at.risk.mat <- do.call(rbind, all.at.risk.terms)
-  
-  #generate empty vector to return eventually
-  ret.vec <- numeric(nvars)
-  for (i in 1:nvars) {
-    #return the score   
-    ret.vec[i] <- sum(zero.indicator * (survival$delta / survival$GCT) * (at.risk.mat[,1] * Z[,i] - at.risk.mat[,i + 1])) / sqrt(n)
-  }
-  
-  ret.vec
-}
 
 
 

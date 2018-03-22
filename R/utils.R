@@ -3,6 +3,11 @@
 #this function is used for fast at risk set calculation
 cumsumRev <- function(a) rev(cumsum(rev(a)))
 
+sigmoid <- function(x, tau) 
+{
+  1 / (1 + exp(-x / tau))
+}
+
 #this function checks if the working directory is ivsurv and changes it to simulations
 setwd2sim <- function() 
 {

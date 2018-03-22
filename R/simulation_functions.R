@@ -296,8 +296,8 @@ simIVSurvivalData <- function(sample.size,
   Fail.time <- pmin(vars$Y, lim.time)
   if (dependent.censoring)
   {
-    beta.x <- runif(NCOL(X), min = -0.5, max = 0.5)
-    beta.z <- runif(1, min = -0.5, max = 0.5)
+    beta.x <- runif(NCOL(X), min = -1, max = 1)
+    beta.z <- runif(1, min = -1, max = 1)
     
     beta.z <- betaz.cens
     beta.x <- betax.cens

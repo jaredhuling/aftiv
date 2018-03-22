@@ -11,7 +11,8 @@
 #'     \itemize{
 #'         \item{\code{"AFT-IPCW"}}{ The proposed IV method that uses inverse probability of censoring weighting }
 #'         \item{\code{"AFT"}} { Plain rank-based AFT method that does not account for unmeasured confounding}
-#'         \item{\code{"AFT-IV"}} { biased AFT method that acccounts for unmeasured confounding, but not the non-ignorable censoring }
+#'         \item{\code{"AFT-IV"}} { biased AFT method that acccounts for unmeasured confounding, but not the non-ignorable censoring 
+#'         (and is hence biased) }
 #'         \item{\code{"AFT-2SLS"}} { Two-stage AFT method which accounts for unmeasured confounding but requires correct specification 
 #'         of relationship between IV and exposure }
 #'     }
@@ -28,6 +29,8 @@
 #' @param verbose should messages be printed? logical variable
 #' @param BB.control control list for \code{BBsolve()} function. See \code{\link[BB]{BBsolve}} for more information
 #' @param ... not used
+#' @import ggplot2
+#' @import stats
 #' 
 #'
 #' @examples
