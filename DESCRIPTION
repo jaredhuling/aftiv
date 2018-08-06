@@ -24,4 +24,4 @@ Imports:
   methods,
   stats
 LinkingTo: Rcpp, RcppEigen
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0
