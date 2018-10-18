@@ -9,7 +9,7 @@ You can install the development version of aftiv from
 [github](https://github.com/jaredhuling/aftiv) with:
 
 ``` r
-devtools::install_.packages_github("jaredhuling/aftiv")
+devtools::install_github("jaredhuling/aftiv")
 ```
 
 ## Example
@@ -53,7 +53,7 @@ system.time(aftf <- aftfit(Surv(log.t, delta) ~ ., data = df,
 #> [1] "Current ssf: 9.77557e-07   Best ssf: 9.77557e-07, sd: 0.1"
 #> [1] "Current ssf: 0.108804   Best ssf: 0.108804, sd: 0.1"
 #>    user  system elapsed 
-#>  20.962   1.753  23.136
+#>  20.323   1.679  22.075
 ```
 
 Investigate results:

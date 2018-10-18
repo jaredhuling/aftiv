@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
 You can install the development version of aftiv from [github](https://github.com/jaredhuling/aftiv) with:
 
 ``` r
-devtools::install_.packages_github("jaredhuling/aftiv")
+devtools::install_github("jaredhuling/aftiv")
 ```
 
 ## Example
