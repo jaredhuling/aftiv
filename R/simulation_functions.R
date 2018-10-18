@@ -224,7 +224,7 @@ genMultivarIVData <- function(N = N, Z2XCoef, U2XCoef, U2YCoef, beta, num.confou
 
 
 
-
+#' @export
 simIVSurvivalData <- function(sample.size, 
                               conf.corr.X = 0.0, 
                               conf.corr.Y, 
@@ -379,6 +379,7 @@ simIVSurvivalData <- function(sample.size,
   data.simu
 }
 
+#' @export
 simIVMultivarSurvivalData <- function(sample.size, 
                                       conf.corr.X = 0.0, 
                                       conf.corr.Y = 0, 
@@ -491,7 +492,7 @@ simIVMultivarSurvivalData <- function(sample.size,
   ret
 }
 
-
+#' @export
 SimIVDataCompareEstimators <- function(type, 
                                        n.sims, 
                                        sample.size, 
@@ -768,7 +769,7 @@ SimIVDataCompareEstimators <- function(type,
 }
 
 
-
+#' @export
 SimIVDataCompareEstimatorsMultivar <- function(type, 
                                                n.sims, 
                                                sample.size, 
@@ -924,7 +925,7 @@ SimIVDataCompareEstimatorsMultivar <- function(type,
   res
 }
 
-
+#' @export
 summary.AFTsim <- function(res) 
 {
   # summary function for the output of the 
@@ -957,7 +958,7 @@ summary.AFTsim <- function(res)
   results
 }
 
-
+#' @export
 createGrid <- function(U2X.range, U2Y.range, Z2X.range, n.data, sample.size, lambda.range)
 {
   stopifnot(is.numeric(U2X.range) & is.numeric(U2Y.range) & is.numeric(Z2X.range) 
@@ -969,6 +970,7 @@ createGrid <- function(U2X.range, U2Y.range, Z2X.range, n.data, sample.size, lam
   grid
 }
 
+#' @export
 simulateGrid <- function(est.eqns, 
                          grid, beta, 
                          seed = NULL, 

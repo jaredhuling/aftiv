@@ -16,6 +16,8 @@
 #'         \item{\code{"AFT-2SLS"}} { Two-stage AFT method which accounts for unmeasured confounding but requires correct specification 
 #'         of relationship between IV and exposure }
 #'     }
+#' @param smoothed should a smoothed version of the estimating equation be used? Experimental.
+#' @param weights observation weights. Not used currently!
 #' @param bootstrap logical variable indicating whether or not to run bootstrap
 #' @param boot.method bootstrap method to use. \code{"ls"} uses the LS method of Zeng and Lin (2008), 
 #' \code{"sv"} uses the SV method of Zeng and Lin (2008). \code{"full.bootstrap"} uses a full boostrap where resampled estimating equations
@@ -23,6 +25,8 @@
 #' @param B number of bootstrap iterations
 #' @param dependent.censoring for the \code{"AFT-IPCW"} method, should the censoring model allow for dependence on covariates? If \code{TRUE}
 #' a Cox model will be fit for the censoring distribution
+#' @param na.action how should missing data be treated? See help file for \code{\link[stats]{lm}} for more details
+#' @param return.data should the data be returned?
 #' @param init vector equal to the length of the number of parameters in the model used to initialize estimation
 #' @param tol positive tolerance threshold. Smaller values indicate more precise solutions are required
 #' @param maxit maximum number of restarts for \code{BB} algorithm
@@ -31,6 +35,7 @@
 #' @param ... not used
 #' @import ggplot2
 #' @import stats
+#' @export
 #' 
 #'
 #' @examples
@@ -204,7 +209,7 @@ aftfit <- function(formula,
     
     if (verbose) 
     {
-      cat("Fitting model", e, "\n")
+      cat("Fitting model:", method[e], "\n")
     }
     
     # solve for beta using deriv-free spectral method
@@ -227,7 +232,7 @@ aftfit <- function(formula,
     {
       if (verbose) 
       {
-        cat("Bootstrapping model", e, "\n")
+        cat("Bootstrapping model:", method[e], "\n")
       }
       
       # bootstrap estimate
@@ -251,7 +256,7 @@ aftfit <- function(formula,
   ret
 }
 
-
+#' @export
 repFitAFT <- function(tol                 = 5, 
                       maxit               = 25, 
                       data, 
@@ -320,7 +325,7 @@ repFitAFT <- function(tol                 = 5,
 }
 
 
-
+#' @export
 fitAFT <- function(data, 
                    est.eqn             = NULL, 
                    instrument.names, 
@@ -608,7 +613,7 @@ fitAFT <- function(data,
 
 
 
-
+#' @export
 bootstrap.model <- function(model, 
                             formula, 
                             data, 

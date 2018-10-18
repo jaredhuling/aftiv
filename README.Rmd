@@ -1,0 +1,68 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+# aftiv
+
+
+## Installation
+
+You can install the development version of aftiv from [github](https://github.com/jaredhuling/aftiv) with:
+
+``` r
+devtools::install_.packages_github("jaredhuling/aftiv")
+```
+
+## Example
+
+This is a basic example which shows you how to fit a semiparametric AFT model with instrumental variable estimation:
+
+```{r load_package, warning=FALSE,message=FALSE}
+library(aftiv)
+```
+
+```{r example}
+
+## simulate data
+set.seed(1)
+true.beta <- c(1,-0.5,-0.5,0.25,0,0,-0.75,0.75)
+dat <- simIVMultivarSurvivalData(500,1,1,-1,1,true.beta,num.confounded = 1,
+                                 confounding.function = "exp")
+
+## delta is event indicator, log.t is log of the observed time
+## X are the covariates, the first of which is the exposure of interest, the 
+## rest are covariates to adjust for
+df <- data.frame(dat$survival[c("delta", "log.t")], dat$X)
+
+## Z is the instrument, related to the first variable in X
+Z <- dat$Z
+
+system.time(aftf <- aftfit(Surv(log.t, delta) ~ ., data = df, 
+                           instrument = Z, 
+                           confounded.x.names = "X1", # name of the exposure of interest
+                           method = c("AFT",       # naive, unadjusted (biased) estimator
+                                      "AFT-2SLS",  # 2-stage approach that relies on IV model
+                                      "AFT-IV",    # incorrect approach
+                                      "AFT-IPCW"), # proposed approach of Huling, et al
+                           boot.method = "ls", 
+                           B = 200L, ## number of bootstrap iterations
+                           bootstrap = TRUE)) ## use bootstrap for Conf Intervals
+
+
+```
+
+Investigate results:
+```{r cars}
+summary(aftf)
+```
+

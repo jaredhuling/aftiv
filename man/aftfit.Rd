@@ -31,6 +31,10 @@ The response must be a survival object as returned by the \code{Surv()} function
     of relationship between IV and exposure }
 }}
 
+\item{smoothed}{should a smoothed version of the estimating equation be used? Experimental.}
+
+\item{weights}{observation weights. Not used currently!}
+
 \item{bootstrap}{logical variable indicating whether or not to run bootstrap}
 
 \item{boot.method}{bootstrap method to use. \code{"ls"} uses the LS method of Zeng and Lin (2008), 
@@ -42,7 +46,11 @@ are solved for each iteration (this method is very slow!)}
 \item{dependent.censoring}{for the \code{"AFT-IPCW"} method, should the censoring model allow for dependence on covariates? If \code{TRUE}
 a Cox model will be fit for the censoring distribution}
 
+\item{na.action}{how should missing data be treated? See help file for \code{\link[stats]{lm}} for more details}
+
 \item{init}{vector equal to the length of the number of parameters in the model used to initialize estimation}
+
+\item{return.data}{should the data be returned?}
 
 \item{tol}{positive tolerance threshold. Smaller values indicate more precise solutions are required}
 

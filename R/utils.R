@@ -26,6 +26,7 @@ loadPackages <- function(load = TRUE)
   packages
 }
 
+#' @export
 runParallel <- function(ncores = NULL)
 {
   switch(Sys.info()[["sysname"]], 

@@ -255,7 +255,7 @@ svBootstrap <- function(beta, esteqn, B, nobs,
 
   V <- var(Un1)
   
-  print(attr(esteqn, "name"))
+  #print(attr(esteqn, "name"))
   #print(solve(V))
   ##############Zb <- mvrnorm(n = B, rep(0, p), Sigma = solve(V))
   

@@ -126,6 +126,7 @@ internalPlotBetaAndCI <- function(melted, truth, faceted = F, held, multi = F, C
 
 }
 
+#' @export
 plotBetaAndCI <- function(res, X = NULL, Y = NULL, IS = NULL, sample.size = NULL, truth,
                           faceted = F, CI = c("ci", "quantile90", "quantile95")){
   CI <- match.arg(CI)
@@ -168,6 +169,7 @@ meltParamVec <- function(res, X = NULL, Y = NULL, IS = NULL){
   melted
 }
 
+#' @export
 plot.AFTsim <- function(res) {
   stopifnot(class(res) == "AFTsim")
   cbPalette <- c("springgreen4", "blue", "darkorange", "red")
@@ -192,6 +194,7 @@ plot.AFTsim <- function(res) {
           legend.position="bottom") + 
     geom_vline(size = 0.75, xintercept = attr(res, "truth"), colour = "grey50")
 }
+
 
 plotEstimatingEquations <- function(type = "AFT", sample.size, conf.corr.X = 0.0, conf.corr.Y = 0.0, instrument.strength, lambda, beta0, beta1) {
   # use this function to generate a plot of the values of an estimating equation (or vector of est eqns)

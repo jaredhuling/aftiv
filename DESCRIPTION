@@ -4,7 +4,7 @@ Title: Instrumental Variable Estimation for Time-to-Event Data
 Version: 0.1
 Author: Jared Huling
 Maintainer: Who to complain to <jaredhuling@gmail.com>
-Description: Provides instrumental variable estimation under the semiparametric AFT model using rank-based estimating equations
+Description: Provides instrumental variable estimation under the semiparametric AFT model using rank-based estimating equations.
 License: GPL-2
 Depends: 
   Rcpp (>= 0.10.6), 
@@ -22,6 +22,8 @@ Depends:
   ggplot2
 Imports:
   methods,
-  stats
+  stats,
+  foreach
 LinkingTo: Rcpp, RcppEigen
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0
+Encoding: UTF-8

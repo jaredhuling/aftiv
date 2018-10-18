@@ -1,3 +1,4 @@
+#' @export
 summary.aftfits <- function(object,  conf.int = 0.95, 
                             models = 1:length(object$fit.objects), scale = 1, 
                             return.summary = FALSE, ...) 
@@ -88,7 +89,7 @@ summary.aftfits <- function(object,  conf.int = 0.95,
   }
 }
 
-
+#' @export
 print.summary.aftfit <-
   function(x, digits = max(getOption('digits')-3, 3),  
            signif.stars = getOption("show.signif.stars"), ...) {
