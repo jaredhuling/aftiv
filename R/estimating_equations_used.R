@@ -62,6 +62,9 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC, multiplier.wts = NULL)
   #generate empty vector to return eventually
   ret.vec <- numeric(nvars)
   
+  
+  at.risk.terms <- nrow(data.simu):1
+  
   if (!is.null(multiplier.wts)) 
   {
     Zm <- Z * multiplier.wts
@@ -71,7 +74,11 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC, multiplier.wts = NULL)
     for (i in 1:nvars) 
     {
       #return the score   
-      ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * (at.risk.mat[,1] * Zm[,i] - at.risk.mat[,i + 1])) / sqrt(n)
+      #ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * (at.risk.mat[,1] * Zm[,i] - at.risk.mat[,i + 1])) / sqrt(n)
+      
+      ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * at.risk.terms * 
+                          (1 * Zm[,i] - at.risk.mat[,i + 1] / at.risk.mat[,1])) / sqrt(n)
+      
     }
   } else 
   {
@@ -81,7 +88,17 @@ AFTivIPCWScorePreKM <- function(beta, data.simu, GC, multiplier.wts = NULL)
     for (i in 1:nvars) 
     {
       #return the score   
-      ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * (at.risk.mat[,1] * Z[,i] - at.risk.mat[,i + 1])) / sqrt(n)
+      #ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * (at.risk.mat[,1] * Z[,i] - at.risk.mat[,i + 1])) / sqrt(n)
+      
+      
+      ret.vec[i] <- sum(zero.indicator * (survival$delta / GCT) * at.risk.terms * 
+                          (1 * Z[,i] - at.risk.mat[,i + 1] / at.risk.mat[,1])) / sqrt(n)
+      
+      ## univar:
+      
+      ## at.risk.terms <- nrow(data.simu):1
+      ##     return(sum(zero.indicator * (data.simu$delta / data.simu$GCT) * at.risk.terms *
+      ## (data.simu$Z/nn - (1/nn)*data.simu$IPCW.at.risk.Z.terms / data.simu$IPCW.at.risk.terms)) / (sqrt(nn)))
     }
   }
   
@@ -283,8 +300,21 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     #                       (ZXmat[,i]/n - (at.risk.mat[,i + 1]/n)/at.risk.terms  )) / sqrt(n)
     # }
     
-    ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
-                        (ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n) / at.risk.terms)  ) / sqrt(n)
+    #### PREVIOUS
+    #ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
+    #                    (ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n) / at.risk.terms)  ) / sqrt(n)
+    
+    eemat <- (survival$delta) * at.risk.mat[,1] * 
+      (ZXmat/n - apply((at.risk.mat[,-1,drop = FALSE]/n), 2, function(xc) xc/at.risk.mat[,1]))
+    
+    for (ii in 1:length(conf.x.loc))
+    {
+      eemat[,conf.x.loc[ii]] <- zero.indicator * eemat[,conf.x.loc[ii]] / survival$GCT
+    }
+    
+    ret.vec <- mean(at.risk.terms) * colSums( eemat ) / sqrt(n)
+
+    
     
     # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
     #                      (at.risk.terms * ZXmat/n - (at.risk.mat[,-1,drop = FALSE]/n))  ) / sqrt(n)
@@ -303,8 +333,19 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     #                       (at.risk.terms * ZXmat[,i]/n - at.risk.mat[,i + 1]/n)) / sqrt(n) # at.risk.mat[,1]
     # }
     
-    ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
-                         (ZXmat/n - ((multiplier.wts / at.risk.terms) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)
+    ## PREVIOUS
+    # ret.vec <- mean(at.risk.terms) * colSums(zero.indicator * (survival$delta / survival$GCT) *
+    #                      (ZXmat/n - ((multiplier.wts / at.risk.terms) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)
+    
+    eemat <- (survival$delta) * at.risk.mat[,1] * 
+      (ZXmatm/n - ((multiplier.wts) * apply(at.risk.mat[,-1,drop = FALSE] / n, 2, function(xc) xc/at.risk.mat[,1])))
+    
+    for (ii in 1:length(conf.x.loc))
+    {
+      eemat[,conf.x.loc[ii]] <- zero.indicator * eemat[,conf.x.loc[ii]] / ifelse(survival$GCT==0, 1, survival$GCT)
+    }
+    
+    ret.vec <- mean(at.risk.terms) * colSums( eemat ) / sqrt(n)
     
     # ret.vec <- colSums(zero.indicator * (survival$delta / survival$GCT) *
     #                      (at.risk.terms * ZXmat/n - ((multiplier.wts / 1) * at.risk.mat[,-1,drop = FALSE] / n))  ) / sqrt(n)

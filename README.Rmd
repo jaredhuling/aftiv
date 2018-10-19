@@ -35,8 +35,9 @@ library(aftiv)
 
 ## simulate data
 set.seed(1)
-true.beta <- c(1,-0.5,-0.5,0.25,0,0,-0.75,0.75)
+true.beta <- c(1,-0.5,-0.5,0)
 dat <- simIVMultivarSurvivalData(500,1,1,-1,1,true.beta,num.confounded = 1,
+                                 cens.distribution = "lognormal",
                                  confounding.function = "exp")
 
 ## delta is event indicator, log.t is log of the observed time
