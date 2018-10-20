@@ -58,12 +58,12 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
         if (dependent.censoring)
         {
-          GC.boot  <- genKMCensoringFunc(data[samp.idx,], cox = TRUE, X = data[samp.idx,]$X)
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,,drop=FALSE], cox = TRUE, X = data[samp.idx,,drop=FALSE]$X)
         } else
         {
-          GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,,drop=FALSE])
         }
-        Un2[i,]  <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,])
+        Un2[i,]  <- esteqn(beta = beta, GC = GC.boot, data.simu = data[samp.idx,,drop=FALSE])
       }
     } else 
     {
@@ -79,8 +79,8 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
         samp.idx2 <- sample.int(nobs, nobs, replace = TRUE)
         if (dependent.censoring)
         {
-          GC.boot <- genKMCensoringFunc(survival[samp.idx2,], cox = TRUE, 
-                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc]))[samp.idx2,] )
+          GC.boot <- genKMCensoringFunc(survival[samp.idx2,,drop=FALSE], cox = TRUE, 
+                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc,drop=FALSE]))[samp.idx2,,drop=FALSE] )
         } else 
         {
           GC.boot <- genKMCensoringFunc(survival[samp.idx2,])
@@ -96,9 +96,9 @@ lsBootstrap <- function(beta, esteqn, B, nobs, GC = NULL, VarFunc = NULL, n.risk
         
         Un2[i,]  <- esteqn(beta       = beta, 
                            GC         = GC.boot, 
-                           survival   = survival,
-                           X          = X, 
-                           ZXmat      = ZXmat, 
+                           survival   = survival[samp.idx,,drop=FALSE],
+                           X          = X[samp.idx,,drop=FALSE], 
+                           ZXmat      = ZXmat[samp.idx,,drop=FALSE], 
                            conf.x.loc = conf.x.loc,
                            multiplier.wts = Mb[,i])
       }
@@ -212,14 +212,14 @@ svBootstrap <- function(beta, esteqn, B, nobs,
         samp.idx <- sample.int(nobs, nobs, replace = TRUE)
         if (dependent.censoring)
         {
-          GC.boot  <- genKMCensoringFunc(data[samp.idx,], cox = TRUE, X = data[samp.idx,]$X)
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,,drop=FALSE], cox = TRUE, X = data[samp.idx,,drop=FALSE]$X)
         } else
         {
-          GC.boot  <- genKMCensoringFunc(data[samp.idx,])
+          GC.boot  <- genKMCensoringFunc(data[samp.idx,,drop=FALSE])
         }
         Un1[i,]  <- esteqn(beta      = beta, 
                            GC        = GC.boot, 
-                           data.simu = data[samp.idx,])
+                           data.simu = data[samp.idx,,drop=FALSE])
       }
     } else 
     {
@@ -235,19 +235,27 @@ svBootstrap <- function(beta, esteqn, B, nobs,
         
         if (dependent.censoring)
         {
-          GC.boot <- genKMCensoringFunc(survival[samp.idx,], cox = TRUE, 
-                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc]))[samp.idx,] )
+          GC.boot <- genKMCensoringFunc(survival[samp.idx,,drop=FALSE], cox = TRUE, 
+                                   X = as.matrix(cbind(X, ZXmat[,conf.x.loc,drop=FALSE]))[samp.idx,,drop=FALSE] )
         } else 
         {
           GC.boot <- genKMCensoringFunc(survival[samp.idx,])
         }
         
-        Un1[i,]  <- esteqn(beta       = beta, 
-                           GC         = GC.boot, 
-                           survival   = survival[samp.idx,],
-                           X          = X[samp.idx,], 
-                           ZXmat      = ZXmat[samp.idx,], 
-                           conf.x.loc = conf.x.loc)
+        # Un1[i,]  <- esteqn(beta       = beta,
+        #                    GC         = GC.boot,
+        #                    survival   = survival[samp.idx,],
+        #                    X          = X[samp.idx,],
+        #                    ZXmat      = ZXmat[samp.idx,],
+        #                    conf.x.loc = conf.x.loc)
+        
+        Un1[i,]  <- esteqn(beta       = beta,
+                           GC         = GC.boot,
+                           survival   = survival[samp.idx,,drop=FALSE],
+                           X          = X[samp.idx,,drop=FALSE],
+                           ZXmat      = ZXmat[samp.idx,,drop=FALSE],
+                           conf.x.loc = conf.x.loc,
+                           multiplier.wts = Mb[,i])
       }
       
     }

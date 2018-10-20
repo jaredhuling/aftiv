@@ -307,6 +307,11 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     eemat <- (survival$delta) * at.risk.mat[,1] * 
       (ZXmat/n - apply((at.risk.mat[,-1,drop = FALSE]/n), 2, function(xc) xc/at.risk.mat[,1]))
     
+    # for (ii in 1:NCOL(eemat))
+    # {
+    #   eemat[,ii] <- zero.indicator * eemat[,ii] / survival$GCT
+    # }
+    
     for (ii in 1:length(conf.x.loc))
     {
       eemat[,conf.x.loc[ii]] <- zero.indicator * eemat[,conf.x.loc[ii]] / survival$GCT
@@ -339,6 +344,11 @@ AFTivIPCWScorePre <- function(beta, survival, X, ZXmat, Z, GC, conf.x.loc = conf
     
     eemat <- (survival$delta) * at.risk.mat[,1] * 
       (ZXmatm/n - ((multiplier.wts) * apply(at.risk.mat[,-1,drop = FALSE] / n, 2, function(xc) xc/at.risk.mat[,1])))
+    
+    # for (ii in 1:NCOL(eemat))
+    # {
+    #   eemat[,ii] <- zero.indicator * eemat[,ii] / ifelse(survival$GCT==0, 1, survival$GCT)
+    # }
     
     for (ii in 1:length(conf.x.loc))
     {
@@ -600,7 +610,7 @@ genIPCWNumDenomMultivar <- function(dat, Zx, Z, X, GC.func, conf.x.loc)
   ret.mat <- do.call(rbind, at.risk.list)
   for (j in idx)
   {
-  ret.mat[,j+1] <- cumsumRev(Zx[,j])
+    ret.mat[,j+1] <- cumsumRev(Zx[,j])
   }
   ret.mat
 }
